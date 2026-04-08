@@ -9,7 +9,7 @@
 #   export AI_COMPLETE_API_KEY="sk-..."          (required)
 #   export AI_COMPLETE_MAX_ITEMS=5               (optional, default 5)
 #   export AI_COMPLETE_MODEL="gpt-4o-mini"       (optional)
-#   export AI_COMPLETE_API_URL="https://..."      (optional)
+#   export AI_COMPLETE_RENDER_MODE="auto"       (optional: auto | multiline | inline)
 #
 # Dependencies: jq, curl
 
@@ -20,7 +20,54 @@ _ai_setup() {
         export PATH="$script_dir:$PATH"
     fi
 }
+
+_ai_setup_render_mode() {
+    local configured_mode="${AI_COMPLETE_RENDER_MODE:-auto}"
+
+    case "$configured_mode" in
+        inline|multiline)
+            _AI_RENDER_MODE="$configured_mode"
+            ;;
+        auto)
+            _AI_RENDER_MODE="multiline"
+            ;;
+        *)
+            _AI_RENDER_MODE="multiline"
+            ;;
+    esac
+}
+
+_ai_menu_lines() {
+    local n=${#_AI_SUGGESTIONS}
+    local max=${_AI_MAX_ITEMS}
+    (( max > n )) && max=$n
+    print $(( max + 2 ))
+}
+
+_ai_adjust_render_mode_for_space() {
+    local configured_mode="${AI_COMPLETE_RENDER_MODE:-auto}"
+
+    case "$configured_mode" in
+        inline|multiline)
+            _AI_RENDER_MODE="$configured_mode"
+            return
+            ;;
+    esac
+
+    _AI_RENDER_MODE="multiline"
+
+    case "${TERM_PROGRAM:-}" in
+        Apple_Terminal|iTerm.app)
+            local lines_available=${LINES:-0}
+            local menu_lines=$(_ai_menu_lines)
+            local last_lines=${_AI_LAST_LINES:-0}
+            (( lines_available > 0 && last_lines > 0 && lines_available - last_lines <= menu_lines )) && _AI_RENDER_MODE="inline"
+            ;;
+    esac
+}
+
 _ai_setup
+_ai_setup_render_mode
 
 # ── Config ────────────────────────────────────────────────────
 _AI_MAX_ITEMS=${AI_COMPLETE_MAX_ITEMS:-5}
@@ -36,6 +83,8 @@ _AI_ORIGINAL=""
 _AI_RIGHT=""
 _AI_SCROLL=0
 _AI_LIST_LINES=0
+_AI_LAST_LINES=0
+_AI_RENDER_MODE="${_AI_RENDER_MODE:-multiline}"
 
 # ── Clamp scroll window ──────────────────────────────────────
 _ai_clamp_scroll() {
@@ -46,6 +95,12 @@ _ai_clamp_scroll() {
 
 # ── Clear rendered menu ───────────────────────────────────────
 _ai_clear_menu() {
+    if [[ "$_AI_RENDER_MODE" == "inline" ]]; then
+        zle -M ""
+        _AI_LIST_LINES=0
+        return
+    fi
+
     (( _AI_LIST_LINES > 0 )) || return
 
     local i
@@ -74,16 +129,31 @@ _ai_buffer_changed() {
     [[ "$LBUFFER" != "$_AI_ORIGINAL" || "$RBUFFER" != "$_AI_RIGHT" ]]
 }
 
+# ── Render current suggestion inline ──────────────────────────
+_ai_show_inline() {
+    local n=${#_AI_SUGGESTIONS}
+    local item="${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}"
+    zle -M "AI [$(( _AI_INDEX + 1 ))/$n] $item"
+    _AI_LIST_LINES=0
+    _AI_LAST_LINES=${LINES:-0}
+}
+
 # ── Render bordered vertical list ────────────────────────────
 _ai_show() {
     (( ${#_AI_SUGGESTIONS} > 0 )) || return
 
+    _ai_adjust_render_mode_for_space
+    if [[ "$_AI_RENDER_MODE" == "inline" ]]; then
+        _ai_show_inline
+        return
+    fi
+
     _ai_clamp_scroll
 
-    # Let ZLE refresh the command line FIRST (positions cursor correctly)
-    zle redisplay
-
     _ai_clear_menu
+
+    # Let ZLE refresh the command line AFTER old menu is cleared
+    zle redisplay
 
     # DEC save cursor (separate slot from CSI s/u, avoids ZLE conflicts)
     printf '\e7'
@@ -132,6 +202,7 @@ _ai_show() {
     printf '└%s┘' "$dashes"
 
     _AI_LIST_LINES=$(( e - s + 2 ))  # items + top + bottom
+    _AI_LAST_LINES=${LINES:-0}
 
     # DEC restore cursor to command line
     printf '\e8'
