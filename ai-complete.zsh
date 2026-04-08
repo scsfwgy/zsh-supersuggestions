@@ -69,6 +69,11 @@ _ai_reset_menu() {
     _AI_RIGHT=""
 }
 
+# ── Detect whether buffer changed since menu opened ───────────
+_ai_buffer_changed() {
+    [[ "$LBUFFER" != "${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}" || "$RBUFFER" != "$_AI_RIGHT" ]]
+}
+
 # ── Render bordered vertical list ────────────────────────────
 _ai_show() {
     (( ${#_AI_SUGGESTIONS} > 0 )) || return
@@ -141,11 +146,16 @@ _ai_tab() {
 
     [[ -z "${input// /}" ]] && { zle expand-or-complete; return }
 
-    # Menu already open → cycle
+    # Menu already open → cycle only if buffer still matches current selection
     if (( _AI_ACTIVE )); then
-        _AI_INDEX=$(( (_AI_INDEX + 1) % ${#_AI_SUGGESTIONS} ))
-        _ai_show
-        return
+        if _ai_buffer_changed; then
+            _ai_clear_menu
+            _ai_reset_menu
+        else
+            _AI_INDEX=$(( (_AI_INDEX + 1) % ${#_AI_SUGGESTIONS} ))
+            _ai_show
+            return
+        fi
     fi
 
     _AI_ORIGINAL="$input"
