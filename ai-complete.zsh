@@ -9,7 +9,6 @@
 #   export AI_COMPLETE_API_KEY="sk-..."          (required)
 #   export AI_COMPLETE_MAX_ITEMS=5               (optional, default 5)
 #   export AI_COMPLETE_MODEL="gpt-4o-mini"       (optional)
-#   export AI_COMPLETE_RENDER_MODE="auto"       (optional: auto | multiline | inline)
 #
 # Dependencies: jq, curl
 
@@ -22,19 +21,7 @@ _ai_setup() {
 }
 
 _ai_setup_render_mode() {
-    local configured_mode="${AI_COMPLETE_RENDER_MODE:-auto}"
-
-    case "$configured_mode" in
-        inline|multiline)
-            _AI_RENDER_MODE="$configured_mode"
-            ;;
-        auto)
-            _AI_RENDER_MODE="multiline"
-            ;;
-        *)
-            _AI_RENDER_MODE="multiline"
-            ;;
-    esac
+    _AI_RENDER_MODE="multiline"
 }
 
 _ai_menu_lines() {
@@ -45,15 +32,6 @@ _ai_menu_lines() {
 }
 
 _ai_adjust_render_mode_for_space() {
-    local configured_mode="${AI_COMPLETE_RENDER_MODE:-auto}"
-
-    case "$configured_mode" in
-        inline|multiline)
-            _AI_RENDER_MODE="$configured_mode"
-            return
-            ;;
-    esac
-
     _AI_RENDER_MODE="multiline"
 
     case "${TERM_PROGRAM:-}" in

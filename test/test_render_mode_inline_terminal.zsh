@@ -18,7 +18,6 @@ zle() {
 
 source "$PROJECT_DIR/ai-complete.zsh" >/dev/null
 
-AI_COMPLETE_RENDER_MODE=auto
 TERM_PROGRAM=Apple_Terminal
 TERM=xterm-256color
 LINES=10
