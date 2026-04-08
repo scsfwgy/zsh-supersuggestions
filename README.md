@@ -53,6 +53,14 @@ export AI_COMPLETE_MAX_ITEMS=5
 source /path/to/TerminalTab/ai-complete.zsh
 ```
 
+```deepseek 举例
+export AI_COMPLETE_API_KEY="sk-ebfbeed****854700044d"
+export AI_COMPLETE_API_URL="https://api.deepseek.com/v1/chat/completions"
+export AI_COMPLETE_MODEL="deepseek-chat"
+                                                                                                         
+source ~/TerminalTab/ai-complete.zsh  
+```
+
 3. 重新加载 shell：
 
 ```bash
