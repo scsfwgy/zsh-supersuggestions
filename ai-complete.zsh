@@ -24,6 +24,9 @@ _ai_setup
 
 # ── Config ────────────────────────────────────────────────────
 _AI_MAX_ITEMS=${AI_COMPLETE_MAX_ITEMS:-5}
+if ! [[ "$_AI_MAX_ITEMS" == <-> ]] || (( _AI_MAX_ITEMS <= 0 )); then
+    _AI_MAX_ITEMS=5
+fi
 
 # ── State ─────────────────────────────────────────────────────
 _AI_SUGGESTIONS=()
@@ -40,20 +43,35 @@ _ai_clamp_scroll() {
     (( _AI_SCROLL < 0 )) && _AI_SCROLL=0
 }
 
+# ── Clear rendered menu ───────────────────────────────────────
+_ai_clear_menu() {
+    (( _AI_LIST_LINES > 0 )) || return
+    printf '\e[B\e[J\e[A'
+    _AI_LIST_LINES=0
+}
+
+# ── Reset menu state ──────────────────────────────────────────
+_ai_reset_menu() {
+    _AI_ACTIVE=0
+    _AI_SUGGESTIONS=()
+    _AI_INDEX=0
+    _AI_SCROLL=0
+    _AI_LIST_LINES=0
+}
+
 # ── Render bordered vertical list ────────────────────────────
 _ai_show() {
-    _ai_clamp_scroll
+    (( ${#_AI_SUGGESTIONS} > 0 )) || return
 
-    # Clear old list before redisplay (cursor is at end of LBUFFER)
-    if (( _AI_LIST_LINES > 0 )); then
-        printf '\e[B\e[J\e[A'
-    fi
+    _ai_clamp_scroll
 
     LBUFFER="${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}"
     RBUFFER=""
 
     # Let ZLE refresh the command line FIRST (positions cursor correctly)
     zle redisplay
+
+    _ai_clear_menu
 
     # DEC save cursor (separate slot from CSI s/u, avoids ZLE conflicts)
     printf '\e7'
@@ -129,30 +147,34 @@ _ai_tab() {
     { ai-suggest "$input" > "$tmpf" } 2>/dev/null &!
     local bg_pid=$!
 
-    # Spinner via zle -R (managed by ZLE)
+    # Inline spinner after current input
     local spin=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠧' '⠇' '⠏')
     local si=0
     while kill -0 "$bg_pid" 2>/dev/null; do
         LBUFFER="$input"
-        zle -R "  ${spin[$(( si % 9 + 1 ))]} Asking AI..."
+        POSTDISPLAY=" ${spin[$(( si % 9 + 1 ))]}"
+        zle redisplay
         si=$(( si + 1 ))
         sleep 0.1
     done
 
     local raw; raw=$(cat "$tmpf" 2>/dev/null)
     rm -f "$tmpf"
-    zle -R ""
+    POSTDISPLAY=""
+    zle redisplay
 
-    [[ -z "$raw" ]] && { zle expand-or-complete; return }
+    [[ -z "$raw" ]] && { _ai_reset_menu; zle expand-or-complete; return }
 
     _AI_SUGGESTIONS=("${(@f)raw}")
+    (( ${#_AI_SUGGESTIONS} > 0 )) || { _ai_reset_menu; zle expand-or-complete; return }
+
     _AI_ACTIVE=1
     _ai_show
 }
 
 # ── Down arrow: next suggestion ──────────────────────────────
 _ai_down() {
-    if (( _AI_ACTIVE )); then
+    if (( _AI_ACTIVE && ${#_AI_SUGGESTIONS} > 0 )); then
         _AI_INDEX=$(( (_AI_INDEX + 1) % ${#_AI_SUGGESTIONS} ))
         _ai_show
     else
@@ -162,7 +184,7 @@ _ai_down() {
 
 # ── Up arrow: previous suggestion ────────────────────────────
 _ai_up() {
-    if (( _AI_ACTIVE )); then
+    if (( _AI_ACTIVE && ${#_AI_SUGGESTIONS} > 0 )); then
         _AI_INDEX=$(( (_AI_INDEX - 1 + ${#_AI_SUGGESTIONS}) % ${#_AI_SUGGESTIONS} ))
         _ai_show
     else
@@ -172,14 +194,11 @@ _ai_up() {
 
 # ── Enter: accept or execute ─────────────────────────────────
 _ai_enter() {
-    if (( _AI_ACTIVE )); then
-        # Clear list: move down, clear below, move back
-        printf '\e[B\e[J\e[A'
+    if (( _AI_ACTIVE && ${#_AI_SUGGESTIONS} > 0 )); then
+        _ai_clear_menu
         LBUFFER="${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}"
         RBUFFER=""
-        _AI_ACTIVE=0
-        _AI_SUGGESTIONS=()
-        _AI_LIST_LINES=0
+        _ai_reset_menu
         zle redisplay
         return
     fi
@@ -189,12 +208,10 @@ _ai_enter() {
 # ── Ctrl+C: cancel menu ──────────────────────────────────────
 _ai_cancel() {
     if (( _AI_ACTIVE )); then
-        printf '\e[B\e[J\e[A'
+        _ai_clear_menu
         LBUFFER="$_AI_ORIGINAL"
         RBUFFER=""
-        _AI_ACTIVE=0
-        _AI_SUGGESTIONS=()
-        _AI_LIST_LINES=0
+        _ai_reset_menu
         zle redisplay
     else
         zle send-break

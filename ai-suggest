@@ -88,6 +88,21 @@ response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
         }')" 2>/dev/null)
 
 # Extract and clean suggestions
-echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null \
-    | sed 's/^```.*//; s/^[0-9]\+\. //' \
-    | grep -v '^$'
+printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null \
+    | awk '
+        BEGIN { count = 0 }
+        {
+            gsub(/\r/, "")
+            sub(/^[[:space:]]+/, "")
+            sub(/[[:space:]]+$/, "")
+            if ($0 == "" || $0 ~ /^```/) next
+            sub(/^[0-9]+[.)][[:space:]]+/, "")
+            sub(/^[-*•][[:space:]]+/, "")
+            sub(/^[[:space:]]+/, "")
+            sub(/[[:space:]]+$/, "")
+            if ($0 == "" || seen[$0]++) next
+            print
+            count++
+            if (count >= 8) exit
+        }
+    '
