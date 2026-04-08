@@ -1,74 +1,75 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 在本仓库中工作时提供指导。
 
-## Project Overview
+## 项目概述
 
-TerminalTab is a zsh plugin that provides AI-powered command suggestions on Tab key press. It calls an LLM API (OpenAI-compatible) to suggest complete commands for typos, partial input, or valid commands that could use more flags.
+TerminalTab 是一个 zsh 插件，按 Tab 键调用大模型 API 提供命令建议。支持纠正拼写错误、补全部分输入、或为已有命令推荐有用的参数组合。
 
-Two files, zero dependencies beyond `curl` + `jq`:
-- `ai-suggest` — Bash script that calls LLM API, returns newline-separated command suggestions
-- `ai-complete.zsh` — ZLE (Zsh Line Editor) plugin that hooks Tab/Up/Down/Enter keys
+仅两个文件，除 `curl` + `jq` 外零依赖：
+- `ai-suggest` — Bash 脚本，调用 LLM API，返回换行分隔的完整命令建议
+- `ai-complete.zsh` — ZLE（Zsh 行编辑器）插件，拦截 Tab/上/下/回车 键
 
-## Architecture
+## 架构
 
 ```
-User presses Tab
+用户按 Tab
   → ai-complete.zsh (_ai_tab widget)
-    → ai-suggest (background process via &!)
-    → Spinner via zle -R
-    → _ai_show: zle redisplay → save cursor → printf border list → restore cursor
-  → User presses Up/Down
-    → _ai_show re-renders list with new selection in LBUFFER
-  → User presses Enter
-    → Selected command placed in buffer, list cleared
+    → ai-suggest（通过 &! 后台运行）
+    → 通过 zle -R 显示加载动画
+    → _ai_show: zle redisplay → 保存光标 → printf 边框列表 → 恢复光标
+  → 用户按 上/下
+    → _ai_show 重新渲染列表，更新选中项到 LBUFFER
+  → 用户按 回车
+    → 选中命令填入缓冲区，列表清除
 ```
 
-State is managed via global `_AI_*` variables in the zsh session. The `_AI_ACTIVE` flag controls whether special keybindings (arrow keys, Enter) route to AI navigation or fall through to normal zsh behavior.
+状态通过 zsh 会话中的全局 `_AI_*` 变量管理。`_AI_ACTIVE` 标志控制方向键和回车键是路由到 AI 导航还是回退到正常 zsh 行为。
 
-## Setup
+## 配置
 
 ```bash
-# In .zshrc:
+# 在 .zshrc 中：
 export AI_COMPLETE_API_KEY="sk-..."
-export AI_COMPLETE_MODEL="gpt-4o-mini"                    # optional
-export AI_COMPLETE_API_URL="https://api.openai.com/..."    # optional
-export AI_COMPLETE_MAX_ITEMS=5                             # optional
+export AI_COMPLETE_MODEL="gpt-4o-mini"                    # 可选
+export AI_COMPLETE_API_URL="https://api.openai.com/..."    # 可选
+export AI_COMPLETE_MAX_ITEMS=5                             # 可选
 source ~/path/to/TerminalTab/ai-complete.zsh
 ```
 
-## Key Lessons Learned (ZLE + Terminal Display)
+## 关键经验（ZLE + 终端显示）
 
-These are non-obvious pitfalls discovered during development that future changes must respect:
+以下是开发中发现的重要踩坑点，后续修改必须遵守：
 
-### 1. ZLE display management
-- **Never** use raw `printf` to the terminal without coordinating with ZLE. ZLE's auto-refresh (when a widget returns) WILL overwrite or corrupt anything it doesn't know about.
-- The correct sequence: `zle redisplay` first (let ZLE handle command line), then `\e[s` (save cursor), then `printf` the list below, then `\e[u` (restore cursor). This prevents ZLE from fighting the display.
+### 1. ZLE 显示管理
+- **绝不**在未与 ZLE 协调的情况下直接 `printf` 到终端。ZLE 的自动刷新（widget 返回时）会覆盖或破坏它不知道的任何内容。
+- 正确顺序：先 `zle redisplay`（让 ZLE 处理命令行），再 `\e7`（DEC 保存光标），然后 `printf` 列表内容，最后 `\e8`（DEC 恢复光标）。使用 DEC 保存/恢复而非 CSI s/u，避免与 ZLE 内部冲突。
+- 导航（上/下）时需在 `zle redisplay` **之前**先清除旧列表：`\e[B\e[J\e[A`（下移→清除→上移）。
 
-### 2. `zle -R "" list...` is unreliable for custom layout
-- zsh's completion listing system auto-sorts items alphabetically, destroying intentional ordering (e.g. first suggestion should be selected).
-- It also auto-arranges into columns (horizontal packing). Padding items to 200+ chars forces single-column but is hacky and caused `item=` variable echo issues.
-- The `zle -R "multi\nline\nmessage"` approach does NOT render multi-line strings — only the first line appears.
+### 2. `zle -R "" list...` 不适合自定义布局
+- zsh 的补全列表系统会按字母排序，破坏原有顺序（如第一个建议应该默认选中）。
+- 它还会自动横向排列成多列。用 200+ 字符填充强制单列属于 hack 方案，且会导致 `item=` 变量回显问题。
+- `zle -R "多行\n消息"` 方式不会渲染多行字符串——只显示第一行。
 
-### 3. `POSTDISPLAY` is single-line only
-- Despite documentation suggesting otherwise, `POSTDISPLAY` only renders content inline after the cursor on the same line. Multi-line content (with `\n`) is NOT displayed as separate lines.
+### 3. `POSTDISPLAY` 仅支持单行
+- 尽管文档暗示支持多行，`POSTDISPLAY` 只在光标后同一行内渲染。含 `\n` 的多行内容不会显示为多行。
 
-### 4. Background job notifications
-- `{ cmd & } &!` syntax is required — not just `&` with `disown`. The `&!` operator (zsh-specific) immediately disowns the job, preventing `[N] + done cmd...` notifications from appearing.
-- Do NOT use `wait $pid` inside ZLE widgets — it triggers job completion notifications. Use `kill -0 $pid` polling loop instead.
+### 4. 后台任务通知
+- 必须使用 `{ cmd & } &!` 语法——不能仅用 `&` 加 `disown`。`&!`（zsh 专用）会立即剥离任务，防止出现 `[N] + done cmd...` 通知。
+- **不要**在 ZLE widget 内使用 `wait $pid`——它会触发任务完成通知。改用 `kill -0 $pid` 轮询循环。
 
-### 5. Variable declarations inside ZLE widget loops
-- `local var` inside a `for` loop in a ZLE widget can cause the assignment to be echoed to the terminal (visible as `item='value'` text). Declare ALL variables outside the loop, assign inside.
+### 5. ZLE widget 循环内的变量声明
+- ZLE widget 的 `for` 循环内使用 `local var` 会导致赋值被回显到终端（显示为 `item='value'` 文本）。所有变量需在循环外声明，循环内赋值。
 
-### 6. ANSI escape codes in zsh strings
-- `\e[7m` (reverse video) must be written as `$'\e[7m'` (quoted `$'...'` syntax), not `\e[7m` in double quotes. The latter prints literal `e[7m` text.
+### 6. zsh 字符串中的 ANSI 转义码
+- `\e[7m`（反色显示）必须用 `$'\e[7m'`（`$'...'` 引用语法），不能用双引号中的 `\e[7m`，后者会原样输出 `e[7m` 文本。
 
-### 7. Escape key binding conflicts
-- Do NOT `bindkey '\e'` (bare Escape) — it conflicts with arrow key sequences (`\e[A`, `\e[B`) since Escape starts all CSI sequences. Use `^C` for cancel instead.
+### 7. Esc 键绑定冲突
+- **不要** `bindkey '\e'`（裸 Escape）——它会与方向键序列（`\e[A`、`\e[B`）冲突，因为 Escape 是所有 CSI 序列的起始。改用 `^C` 取消。
 
-## Extending
+## 扩展
 
-- To change the LLM prompt: edit `PROMPT` variable in `ai-suggest`
-- To change max visible items: `export AI_COMPLETE_MAX_ITEMS=N` or edit `_AI_MAX_ITEMS` default
-- To change border style: edit the `printf` format strings in `_ai_show()`
-- The border width auto-calculates from the longest visible item (min 15, max 50 chars)
+- 修改 LLM 提示词：编辑 `ai-suggest` 中的 `PROMPT` 变量
+- 修改最大显示条目数：`export AI_COMPLETE_MAX_ITEMS=N` 或编辑 `_AI_MAX_ITEMS` 默认值
+- 修改边框样式：编辑 `_ai_show()` 中的 `printf` 格式字符串
+- 边框宽度根据最长可见条目自动计算（最小 15，最大 50 字符）
