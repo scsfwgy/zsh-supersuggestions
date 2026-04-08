@@ -18,9 +18,8 @@ zle() {
 
 source "$PROJECT_DIR/ai-complete.zsh" >/dev/null
 
-TERM=xterm-256color
 LINES=10
-_AI_LAST_LINES=8
+_AI_CURSOR_ROW=8
 _ai_setup_render_mode
 _ai_adjust_render_mode_for_space
 [[ "$_AI_RENDER_MODE" == "inline" ]] || {
@@ -32,6 +31,9 @@ _AI_SUGGESTIONS=('ls -la' 'ls -lh' 'ls -lt')
 _AI_INDEX=1
 _AI_ACTIVE=1
 _AI_SCROLL=0
+_ai_get_cursor_row() {
+    print -- "8"
+}
 _ai_show
 
 [[ "$last_message" == *"[2/3] ls -lh"* ]] || {

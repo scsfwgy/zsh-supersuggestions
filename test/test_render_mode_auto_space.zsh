@@ -16,7 +16,7 @@ _AI_SUGGESTIONS=('ls -la' 'ls -lh' 'ls -laR' 'ls -lS' 'ls -lt')
 _AI_SCROLL=0
 _AI_INDEX=0
 _AI_RENDER_MODE=multiline
-_AI_LAST_LINES=8
+_AI_CURSOR_ROW=8
 
 _ai_adjust_render_mode_for_space
 [[ "$_AI_RENDER_MODE" == "inline" ]] || {
@@ -25,7 +25,7 @@ _ai_adjust_render_mode_for_space
 }
 
 _AI_RENDER_MODE=multiline
-_AI_LAST_LINES=2
+_AI_CURSOR_ROW=2
 _ai_adjust_render_mode_for_space
 [[ "$_AI_RENDER_MODE" == "multiline" ]] || {
     print -u2 "expected multiline to remain when enough lines are available"
@@ -34,7 +34,7 @@ _ai_adjust_render_mode_for_space
 
 LINES=0
 _AI_RENDER_MODE=multiline
-_AI_LAST_LINES=8
+_AI_CURSOR_ROW=8
 _ai_adjust_render_mode_for_space
 [[ "$_AI_RENDER_MODE" == "multiline" ]] || {
     print -u2 "expected multiline to remain when terminal height is unavailable"

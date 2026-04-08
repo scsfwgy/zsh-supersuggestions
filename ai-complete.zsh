@@ -36,10 +36,56 @@ _ai_adjust_render_mode_for_space() {
 
     local lines_available=${LINES:-0}
     local menu_lines=$(_ai_menu_lines)
-    local last_lines=${_AI_LAST_LINES:-0}
-    if (( lines_available > 0 && last_lines > 0 && lines_available - last_lines <= menu_lines )); then
+    local cursor_row=${_AI_CURSOR_ROW:-0}
+    local remaining_lines=$(( lines_available - cursor_row ))
+    if (( lines_available > 0 && cursor_row > 0 && remaining_lines <= menu_lines )); then
         _AI_RENDER_MODE="inline"
     fi
+}
+
+_ai_parse_cursor_row() {
+    local response="$1"
+    local payload row column
+
+    [[ "$response" == $'\e['*';'*'R' ]] || return
+
+    payload="${response#$'\e['}"
+    row="${payload%%;*}"
+    column="${payload#*;}"
+    column="${column%R}"
+
+    [[ "$row" == <-> && "$column" == <-> ]] || return
+    print -- "$row"
+}
+
+_ai_write_cursor_query() {
+    local tty_path="$1"
+    printf '\e[6n' > "$tty_path"
+}
+
+_ai_get_cursor_row() {
+    local tty_path="${_AI_TTY_PATH:-/dev/tty}"
+    local saved_stty response char row
+
+    saved_stty=$(stty -g < "$tty_path" 2>/dev/null) || {
+        print -- ""
+        return
+    }
+
+    {
+        stty -echo -icanon time 1 min 0 < "$tty_path" 2>/dev/null || return
+        _ai_write_cursor_query "$tty_path"
+
+        while read -r -k 1 char < "$tty_path" 2>/dev/null; do
+            response+="$char"
+            [[ "$char" == "R" ]] && break
+        done
+    } always {
+        [[ -n "$saved_stty" ]] && stty "$saved_stty" < "$tty_path" 2>/dev/null
+    }
+
+    row=$(_ai_parse_cursor_row "$response")
+    print -- "$row"
 }
 
 _ai_setup
@@ -59,6 +105,7 @@ _AI_ORIGINAL=""
 _AI_RIGHT=""
 _AI_SCROLL=0
 _AI_LIST_LINES=0
+_AI_CURSOR_ROW=0
 _AI_LAST_LINES=0
 _AI_RENDER_MODE="${_AI_RENDER_MODE:-multiline}"
 
@@ -111,13 +158,13 @@ _ai_show_inline() {
     local item="${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}"
     zle -M "AI [$(( _AI_INDEX + 1 ))/$n] $item"
     _AI_LIST_LINES=0
-    _AI_LAST_LINES=${LINES:-0}
 }
 
 # ── Render bordered vertical list ────────────────────────────
 _ai_show() {
     (( ${#_AI_SUGGESTIONS} > 0 )) || return
 
+    _AI_CURSOR_ROW=$(_ai_get_cursor_row)
     _ai_adjust_render_mode_for_space
     if [[ "$_AI_RENDER_MODE" == "inline" ]]; then
         _ai_show_inline
@@ -178,7 +225,6 @@ _ai_show() {
     printf '└%s┘' "$dashes"
 
     _AI_LIST_LINES=$(( e - s + 2 ))  # items + top + bottom
-    _AI_LAST_LINES=${LINES:-0}
 
     # DEC restore cursor to command line
     printf '\e8'
