@@ -18,14 +18,13 @@ zle() {
 
 source "$PROJECT_DIR/ai-complete.zsh" >/dev/null
 
-TERM_PROGRAM=Apple_Terminal
 TERM=xterm-256color
 LINES=10
 _AI_LAST_LINES=8
 _ai_setup_render_mode
 _ai_adjust_render_mode_for_space
 [[ "$_AI_RENDER_MODE" == "inline" ]] || {
-    print -u2 "expected Apple Terminal to use inline render mode"
+    print -u2 "expected low remaining space to switch into inline render mode"
     exit 1
 }
 

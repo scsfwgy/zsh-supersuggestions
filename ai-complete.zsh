@@ -34,14 +34,12 @@ _ai_menu_lines() {
 _ai_adjust_render_mode_for_space() {
     _AI_RENDER_MODE="multiline"
 
-    case "${TERM_PROGRAM:-}" in
-        Apple_Terminal|iTerm.app)
-            local lines_available=${LINES:-0}
-            local menu_lines=$(_ai_menu_lines)
-            local last_lines=${_AI_LAST_LINES:-0}
-            (( lines_available > 0 && last_lines > 0 && lines_available - last_lines <= menu_lines )) && _AI_RENDER_MODE="inline"
-            ;;
-    esac
+    local lines_available=${LINES:-0}
+    local menu_lines=$(_ai_menu_lines)
+    local last_lines=${_AI_LAST_LINES:-0}
+    if (( lines_available > 0 && last_lines > 0 && lines_available - last_lines <= menu_lines )); then
+        _AI_RENDER_MODE="inline"
+    fi
 }
 
 _ai_setup

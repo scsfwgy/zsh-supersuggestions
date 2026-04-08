@@ -10,8 +10,8 @@ content=$(<"$PLUGIN_FILE")
     exit 1
 }
 
-[[ "$content" == *"Apple_Terminal|iTerm.app"* ]] || {
-    print -u2 "expected built-in native terminal fallback detection to remain"
+[[ "$content" == *"_ai_adjust_render_mode_for_space"* ]] || {
+    print -u2 "expected built-in space-based fallback logic to remain"
     exit 1
 }
 
