@@ -18,6 +18,14 @@ TerminalTab 是一个轻量的 zsh 插件。
 - 建议结果会自动清洗：去重、去编号、去项目符号、去代码块残留
 - 仅依赖 `curl` 和 `jq`
 
+## 示例
+
+![demo1](image/demo1.png)
+
+![demo2](image/demo2.png)
+
+![demo3](image/demo3.png)
+
 ## 原理
 
 TerminalTab 的工作流程很简单：
