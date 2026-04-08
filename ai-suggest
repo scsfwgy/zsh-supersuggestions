@@ -1,0 +1,93 @@
+#!/bin/bash
+# AI-powered command suggestion engine
+# Usage: ai-suggest "user typed text"
+# Output: newline-separated COMPLETE command suggestions
+
+set -eo pipefail
+
+INPUT="$*"
+
+if [[ -z "$INPUT" ]]; then
+    exit 0
+fi
+
+# ── Config (set in .zshrc / .bashrc) ──────────────────────────
+# AI_COMPLETE_API_URL  - API endpoint (default: OpenAI)
+# AI_COMPLETE_API_KEY  - Your API key
+# AI_COMPLETE_MODEL    - Model name (default: gpt-4o-mini)
+# AI_COMPLETE_TIMEOUT  - Timeout in seconds (default: 5)
+# ──────────────────────────────────────────────────────────────
+
+API_URL="${AI_COMPLETE_API_URL:-https://api.openai.com/v1/chat/completions}"
+API_KEY="${AI_COMPLETE_API_KEY:?Set AI_COMPLETE_API_KEY in your shell config}"
+MODEL="${AI_COMPLETE_MODEL:-gpt-4o-mini}"
+TIMEOUT="${AI_COMPLETE_TIMEOUT:-5}"
+
+PROMPT="You are a terminal command suggestion engine.
+The user typed: \"$INPUT\"
+
+Rules:
+- Return COMPLETE commands, one per line — ready to copy-paste and run
+- If the input is a typo, return the corrected full command
+- If the input is a valid command, return useful variations with flags/options
+- Maximum 8 suggestions
+- Do NOT include any explanation, numbering, or markdown — just raw commands
+
+Examples:
+Input: \"toush\" → Output:
+touch filename
+touch -c filename
+touch -a filename
+touch -m filename
+
+Input: \"mkdrs\" → Output:
+mkdir dirname
+mkdir -p path/to/dir
+mkdir -m 755 dirname
+mkdir -v dirname
+
+Input: \"ls\" → Output:
+ls -la
+ls -lh
+ls -laR
+ls -lS
+ls -lt
+ls -l --block-size=M
+
+Input: \"git\" → Output:
+git status
+git add .
+git commit -m \"message\"
+git push
+git pull
+git log --oneline
+git diff
+git stash
+
+Input: \"docker\" → Output:
+docker ps -a
+docker images
+docker compose up -d
+docker logs -f container_name
+docker exec -it container_name bash
+
+Now suggest for: \"$INPUT\""
+
+# Call LLM API (OpenAI-compatible format)
+response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $API_KEY" \
+    -d "$(jq -n \
+        --arg model "$MODEL" \
+        --arg prompt "$PROMPT" \
+        '{
+            model: $model,
+            messages: [{"role": "user", "content": $prompt}],
+            temperature: 0.3,
+            max_tokens: 300
+        }')" 2>/dev/null)
+
+# Extract and clean suggestions
+echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null \
+    | sed 's/^```.*//; s/^[0-9]\+\. //' \
+    | grep -v '^$'
