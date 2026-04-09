@@ -7,8 +7,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 cat > "$TMP_DIR/curl" <<'EOF'
 #!/bin/sh
-cat <<'JSON'
-{
+body='{
   "choices": [
     {
       "message": {
@@ -16,8 +15,26 @@ cat <<'JSON'
       }
     }
   ]
-}
-JSON
+}'
+outfile=""
+writeout=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o)
+      outfile="$2"
+      shift 2
+      ;;
+    -w)
+      writeout="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s' "$body" > "$outfile"
+printf '%s' "${writeout//%\{http_code\}/200}"
 EOF
 chmod +x "$TMP_DIR/curl"
 
