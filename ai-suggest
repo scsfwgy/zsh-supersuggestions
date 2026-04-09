@@ -111,18 +111,11 @@ if [[ "$API_TYPE" == "claude" ]]; then
                 messages: [{"role": "user", "content": $prompt}],
                 max_tokens: 300
             }')" 2>/dev/null) || {
-        if [[ "$MODE" == "ask" ]]; then
-            printf '%s\n' "API request failed (timeout or network error)"
-        fi
+        printf '%s\n' "API request failed (timeout or network error)"
         exit 0
     }
 
-    content=$(printf '%s' "$response" | jq -r '.content[0].text // empty' 2>/dev/null) || {
-        if [[ "$MODE" == "ask" ]]; then
-            printf '%s\n' "Failed to parse API response"
-        fi
-        exit 0
-    }
+    content=$(printf '%s' "$response" | jq -r '.content[0].text // empty' 2>/dev/null) || true
 else
     response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
         -H "Content-Type: application/json" \
@@ -136,32 +129,34 @@ else
                 temperature: 0.3,
                 max_tokens: 300
             }')" 2>/dev/null) || {
-        if [[ "$MODE" == "ask" ]]; then
-            printf '%s\n' "API request failed (timeout or network error)"
-        fi
+        printf '%s\n' "API request failed (timeout or network error)"
         exit 0
     }
 
-    content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null) || {
-        if [[ "$MODE" == "ask" ]]; then
-            printf '%s\n' "Failed to parse API response"
-        fi
-        exit 0
-    }
+    content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null) || true
+fi
+
+# If parsed content is empty, try to extract API error message
+if [[ -z "$content" ]]; then
+    content=$(printf '%s' "$response" | jq -r '.error.message // .error // empty' 2>/dev/null) || true
+fi
+
+# If still empty, fall back to raw response
+[[ -n "$content" ]] || content="$response"
+
+# If still empty, return fixed message
+if [[ -z "$content" ]]; then
+    printf 'no response\n'
+    exit 0
 fi
 
 if [[ "$MODE" == "ask" ]]; then
-    if [[ -z "$content" ]]; then
-        printf '%s\n' 'AI ask failed: empty response from API'
-        exit 0
-    fi
-
     printf '%s\n' "$content"
     exit 0
 fi
 
 # Extract and clean suggestions
-printf '%s' "$content" | awk '
+output=$(printf '%s' "$content" | awk '
     BEGIN { count = 0 }
     {
         gsub(/\r/, "")
@@ -177,4 +172,11 @@ printf '%s' "$content" | awk '
         count++
         if (count >= 8) exit
     }
-'
+')
+
+# If awk cleaned to nothing, show raw content as fallback
+if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+else
+    printf '%s\n' "$content"
+fi
