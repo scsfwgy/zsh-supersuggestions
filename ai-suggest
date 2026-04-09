@@ -5,7 +5,7 @@
 #   suggest mode → newline-separated COMPLETE command suggestions
 #   ask mode     → plain assistant response
 
-set -eo pipefail
+set -o pipefail
 
 MODE="suggest"
 if [[ "${1:-}" == "--ask" ]]; then
@@ -107,9 +107,19 @@ response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
             messages: [{"role": "user", "content": $prompt}],
             temperature: 0.3,
             max_tokens: 300
-        }')" 2>/dev/null)
+        }')" 2>/dev/null) || {
+    if [[ "$MODE" == "ask" ]]; then
+        printf '%s\n' "API request failed (timeout or network error)"
+    fi
+    exit 0
+}
 
-content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null) || {
+    if [[ "$MODE" == "ask" ]]; then
+        printf '%s\n' "Failed to parse API response"
+    fi
+    exit 0
+}
 
 if [[ "$MODE" == "ask" ]]; then
     if [[ -z "$content" ]]; then

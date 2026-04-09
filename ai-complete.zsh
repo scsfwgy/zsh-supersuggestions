@@ -232,19 +232,14 @@ _ai_show() {
 
 _ai_show_answer() {
     local text="$1"
-    local line
-
     [[ -n "$text" ]] || return
 
     _ai_clear_menu
-    zle redisplay
-    printf '\e7'
-    printf '\e[B\r'
-    while IFS= read -r line; do
-        printf '\r\e[2K%s\n' "$line"
-    done <<< "$text"
-    printf '\r\e[2K%s\n' ""
-    printf '\e8'
+
+    # Print answer like normal command output — terminal handles scrolling
+    zle -I
+    printf '\n%s\n' "$text"
+    zle reset-prompt
 }
 
 # ── Shift+Tab: fetch / refresh suggestions ───────────────────
