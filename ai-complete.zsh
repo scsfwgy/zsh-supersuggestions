@@ -230,6 +230,23 @@ _ai_show() {
     printf '\e8'
 }
 
+_ai_show_answer() {
+    local text="$1"
+    local line
+
+    [[ -n "$text" ]] || return
+
+    _ai_clear_menu
+    zle redisplay
+    printf '\e7'
+    printf '\e[B\r'
+    while IFS= read -r line; do
+        printf '\r\e[2K%s\n' "$line"
+    done <<< "$text"
+    printf '\r\e[2K%s\n' ""
+    printf '\e8'
+}
+
 # ── Shift+Tab: fetch / refresh suggestions ───────────────────
 _ai_trigger() {
     local input="${LBUFFER}"
@@ -274,6 +291,38 @@ _ai_trigger() {
 
     _AI_ACTIVE=1
     _ai_show
+}
+
+# ── Ctrl+G: ask AI and render answer ─────────────────────────
+_ai_ask() {
+    local input="${LBUFFER}"
+    [[ -z "${input// /}" ]] && return
+
+    if (( _AI_ACTIVE )); then
+        _ai_clear_menu
+        _ai_reset_menu
+    fi
+
+    local tmpf; tmpf=$(mktemp)
+    { ai-suggest --ask "$input" > "$tmpf" } 2>/dev/null &!
+    local bg_pid=$!
+
+    local spin=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠧' '⠇' '⠏')
+    local si=0
+    while kill -0 "$bg_pid" 2>/dev/null; do
+        LBUFFER="$input"
+        POSTDISPLAY=" ${spin[$(( si % 9 + 1 ))]}"
+        zle redisplay
+        si=$(( si + 1 ))
+        sleep 0.1
+    done
+
+    local answer; answer=$(<"$tmpf" 2>/dev/null)
+    rm -f "$tmpf"
+    POSTDISPLAY=""
+    zle redisplay
+
+    [[ -n "$answer" ]] && _ai_show_answer "$answer"
 }
 
 # ── Down arrow: next suggestion ──────────────────────────────
@@ -324,6 +373,7 @@ _ai_cancel() {
 
 # ── Register widgets ──────────────────────────────────────────
 zle -N ai-trigger _ai_trigger
+zle -N ai-ask _ai_ask
 zle -N ai-down   _ai_down
 zle -N ai-up     _ai_up
 zle -N ai-enter  _ai_enter
@@ -331,6 +381,7 @@ zle -N ai-cancel _ai_cancel
 
 # ── Key bindings ──────────────────────────────────────────────
 bindkey '^[[Z' ai-trigger  # Shift+Tab
+bindkey '^G'   ai-ask      # Ctrl+G
 bindkey '\e[A' ai-up        # Up arrow
 bindkey '\e[B' ai-down      # Down arrow
 bindkey '\eOA' ai-up        # Up arrow (alt)
@@ -340,4 +391,4 @@ bindkey '^J'   ai-enter     # Enter (LF)
 bindkey '^C'   ai-cancel    # Ctrl+C to cancel
 
 # ── Init ──────────────────────────────────────────────────────
-echo "AI command completion loaded. Shift+Tab → suggest, ↑↓ → navigate, Enter → accept."
+echo "AI command completion loaded. Shift+Tab → suggest, Ctrl+G → ask AI, ↑↓ → navigate, Enter → accept."

@@ -1,9 +1,17 @@
 #!/bin/bash
 # AI-powered command suggestion engine
-# Usage: ai-suggest "user typed text"
-# Output: newline-separated COMPLETE command suggestions
+# Usage: ai-suggest [--ask] "user typed text"
+# Output:
+#   suggest mode → newline-separated COMPLETE command suggestions
+#   ask mode     → plain assistant response
 
 set -eo pipefail
+
+MODE="suggest"
+if [[ "${1:-}" == "--ask" ]]; then
+    MODE="ask"
+    shift
+fi
 
 INPUT="$*"
 
@@ -21,9 +29,22 @@ fi
 API_URL="${AI_COMPLETE_API_URL:-https://api.openai.com/v1/chat/completions}"
 API_KEY="${AI_COMPLETE_API_KEY:?Set AI_COMPLETE_API_KEY in your shell config}"
 MODEL="${AI_COMPLETE_MODEL:-gpt-4o-mini}"
-TIMEOUT="${AI_COMPLETE_TIMEOUT:-5}"
+TIMEOUT="${AI_COMPLETE_TIMEOUT:-15}"
 
-PROMPT="You are a terminal command suggestion engine.
+if [[ "$MODE" == "ask" ]]; then
+    PROMPT="You are a terminal assistant.
+The user entered: \"$INPUT\"
+
+Rules:
+- Reply in concise plain text suitable for reading in a terminal
+- The input may be a command, an error message, or a natural-language question
+- Do not use markdown code fences
+- Keep helpful structure when useful
+- Do not number the response unless needed
+
+Now reply to: \"$INPUT\""
+else
+    PROMPT="You are a terminal command suggestion engine.
 The user typed: \"$INPUT\"
 
 Rules:
@@ -72,6 +93,7 @@ docker logs -f container_name
 docker exec -it container_name bash
 
 Now suggest for: \"$INPUT\""
+fi
 
 # Call LLM API (OpenAI-compatible format)
 response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
@@ -87,22 +109,33 @@ response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
             max_tokens: 300
         }')" 2>/dev/null)
 
+content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+
+if [[ "$MODE" == "ask" ]]; then
+    if [[ -z "$content" ]]; then
+        printf '%s\n' 'AI ask failed: empty response from API'
+        exit 0
+    fi
+
+    printf '%s\n' "$content"
+    exit 0
+fi
+
 # Extract and clean suggestions
-printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null \
-    | awk '
-        BEGIN { count = 0 }
-        {
-            gsub(/\r/, "")
-            sub(/^[[:space:]]+/, "")
-            sub(/[[:space:]]+$/, "")
-            if ($0 == "" || $0 ~ /^```/) next
-            sub(/^[0-9]+[.)][[:space:]]+/, "")
-            sub(/^[-*•][[:space:]]+/, "")
-            sub(/^[[:space:]]+/, "")
-            sub(/[[:space:]]+$/, "")
-            if ($0 == "" || seen[$0]++) next
-            print
-            count++
-            if (count >= 8) exit
-        }
-    '
+printf '%s' "$content" | awk '
+    BEGIN { count = 0 }
+    {
+        gsub(/\r/, "")
+        sub(/^[[:space:]]+/, "")
+        sub(/[[:space:]]+$/, "")
+        if ($0 == "" || $0 ~ /^```/) next
+        sub(/^[0-9]+[.)][[:space:]]+/, "")
+        sub(/^[-*•][[:space:]]+/, "")
+        sub(/^[[:space:]]+/, "")
+        sub(/[[:space:]]+$/, "")
+        if ($0 == "" || seen[$0]++) next
+        print
+        count++
+        if (count >= 8) exit
+    }
+'
