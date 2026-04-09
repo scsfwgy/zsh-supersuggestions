@@ -237,13 +237,14 @@ _ai_show_answer() {
     [[ -n "$text" ]] || return
 
     _ai_clear_menu
-
-    # Print answer like normal command output — terminal handles scrolling
-    zle -I
-    printf '\n%s\n' "$text"
     LBUFFER=""
     RBUFFER=""
-    zle reset-prompt
+    zle redisplay
+
+    printf '\e7'
+    printf '\e[B\r\e[J'
+    printf '%s\n' "$text"
+    printf '\e8'
 }
 
 # ── Ctrl+L: fetch / refresh suggestions ───────────────────
