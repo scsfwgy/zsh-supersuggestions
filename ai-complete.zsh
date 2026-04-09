@@ -237,14 +237,17 @@ _ai_show_answer() {
     [[ -n "$text" ]] || return
 
     _ai_clear_menu
-    LBUFFER=""
-    RBUFFER=""
     zle redisplay
 
-    printf '\e7'
+    # Print answer below command line (question text stays above as history)
     printf '\e[B\r\e[J'
     printf '%s\n' "$text"
-    printf '\e8'
+
+    # New empty prompt at current cursor position (after the answer)
+    # Do NOT use zle -I here — it causes full screen redraw on some systems
+    LBUFFER=""
+    RBUFFER=""
+    zle reset-prompt
 }
 
 # ── Ctrl+L: fetch / refresh suggestions ───────────────────
