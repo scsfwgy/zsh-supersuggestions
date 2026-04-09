@@ -20,12 +20,14 @@ if [[ -z "$INPUT" ]]; then
 fi
 
 # ── Config (set in .zshrc / .bashrc) ──────────────────────────
-# AI_COMPLETE_API_URL  - API endpoint (default: OpenAI)
-# AI_COMPLETE_API_KEY  - Your API key
-# AI_COMPLETE_MODEL    - Model name (default: gpt-4o-mini)
-# AI_COMPLETE_TIMEOUT  - Timeout in seconds (default: 5)
+# AI_COMPLETE_API_TYPE  - API protocol: "openai" or "claude" (default: openai)
+# AI_COMPLETE_API_URL   - API endpoint (default: OpenAI)
+# AI_COMPLETE_API_KEY   - Your API key
+# AI_COMPLETE_MODEL     - Model name (default: gpt-4o-mini)
+# AI_COMPLETE_TIMEOUT   - Timeout in seconds (default: 15)
 # ──────────────────────────────────────────────────────────────
 
+API_TYPE="${AI_COMPLETE_API_TYPE:-openai}"
 API_URL="${AI_COMPLETE_API_URL:-https://api.openai.com/v1/chat/completions}"
 API_KEY="${AI_COMPLETE_API_KEY:?Set AI_COMPLETE_API_KEY in your shell config}"
 MODEL="${AI_COMPLETE_MODEL:-gpt-4o-mini}"
@@ -95,31 +97,58 @@ docker exec -it container_name bash
 Now suggest for: \"$INPUT\""
 fi
 
-# Call LLM API (OpenAI-compatible format)
-response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $API_KEY" \
-    -d "$(jq -n \
-        --arg model "$MODEL" \
-        --arg prompt "$PROMPT" \
-        '{
-            model: $model,
-            messages: [{"role": "user", "content": $prompt}],
-            temperature: 0.3,
-            max_tokens: 300
-        }')" 2>/dev/null) || {
-    if [[ "$MODE" == "ask" ]]; then
-        printf '%s\n' "API request failed (timeout or network error)"
-    fi
-    exit 0
-}
+# Call LLM API
+if [[ "$API_TYPE" == "claude" ]]; then
+    response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
+        -H "Content-Type: application/json" \
+        -H "x-api-key: $API_KEY" \
+        -H "anthropic-version: 2023-06-01" \
+        -d "$(jq -n \
+            --arg model "$MODEL" \
+            --arg prompt "$PROMPT" \
+            '{
+                model: $model,
+                messages: [{"role": "user", "content": $prompt}],
+                max_tokens: 300
+            }')" 2>/dev/null) || {
+        if [[ "$MODE" == "ask" ]]; then
+            printf '%s\n' "API request failed (timeout or network error)"
+        fi
+        exit 0
+    }
 
-content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null) || {
-    if [[ "$MODE" == "ask" ]]; then
-        printf '%s\n' "Failed to parse API response"
-    fi
-    exit 0
-}
+    content=$(printf '%s' "$response" | jq -r '.content[0].text // empty' 2>/dev/null) || {
+        if [[ "$MODE" == "ask" ]]; then
+            printf '%s\n' "Failed to parse API response"
+        fi
+        exit 0
+    }
+else
+    response=$(curl -s --max-time "$TIMEOUT" "$API_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $API_KEY" \
+        -d "$(jq -n \
+            --arg model "$MODEL" \
+            --arg prompt "$PROMPT" \
+            '{
+                model: $model,
+                messages: [{"role": "user", "content": $prompt}],
+                temperature: 0.3,
+                max_tokens: 300
+            }')" 2>/dev/null) || {
+        if [[ "$MODE" == "ask" ]]; then
+            printf '%s\n' "API request failed (timeout or network error)"
+        fi
+        exit 0
+    }
+
+    content=$(printf '%s' "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null) || {
+        if [[ "$MODE" == "ask" ]]; then
+            printf '%s\n' "Failed to parse API response"
+        fi
+        exit 0
+    }
+fi
 
 if [[ "$MODE" == "ask" ]]; then
     if [[ -z "$content" ]]; then

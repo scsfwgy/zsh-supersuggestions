@@ -75,14 +75,25 @@ export AI_COMPLETE_MAX_ITEMS=5
 source /path/to/TerminalTab/ai-complete.zsh
 ```
 
+`AI_COMPLETE_API_TYPE` 控制协议格式，默认 `openai`，使用 Claude 时设为 `claude`。
+
 举例
 
 ```deepseek 举例
 export AI_COMPLETE_API_KEY="sk-ebfbeed****854700044d"
 export AI_COMPLETE_API_URL="https://api.deepseek.com/v1/chat/completions"
 export AI_COMPLETE_MODEL="deepseek-chat"
-                                                                                                         
-source ~/TerminalTab/ai-complete.zsh  
+
+source ~/TerminalTab/ai-complete.zsh
+```
+
+```Claude 举例
+export AI_COMPLETE_API_TYPE="claude"
+export AI_COMPLETE_API_KEY="sk-ant-..."
+export AI_COMPLETE_API_URL="https://api.anthropic.com/v1/messages"
+export AI_COMPLETE_MODEL="claude-sonnet-4-20250514"
+
+source ~/TerminalTab/ai-complete.zsh
 ```
 
 3. 重新加载 shell：
@@ -148,7 +159,12 @@ touch -a filename
 
 ## 适配其它 API
 
-如果你使用的是兼容 OpenAI 的第三方接口，只要它支持 Chat Completions 风格请求，通常只需要改：
+支持两种协议，通过 `AI_COMPLETE_API_TYPE` 切换：
+
+- `openai`（默认）：兼容 OpenAI、DeepSeek、通义千问等 Chat Completions 风格接口
+- `claude`：Anthropic Claude 官方 API
+
+OpenAI 兼容接口只需改 URL 和模型：
 
 ```bash
 export AI_COMPLETE_API_URL="https://your-api.example.com/v1/chat/completions"

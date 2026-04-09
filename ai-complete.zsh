@@ -10,6 +10,7 @@
 #   export AI_COMPLETE_API_KEY="sk-..."          (required)
 #   export AI_COMPLETE_MAX_ITEMS=5               (optional, default 5)
 #   export AI_COMPLETE_MODEL="gpt-4o-mini"       (optional)
+#   export AI_COMPLETE_API_TYPE="openai"         (optional: openai or claude)
 #
 # Dependencies: jq, curl
 
