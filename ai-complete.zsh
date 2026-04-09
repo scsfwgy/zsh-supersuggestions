@@ -1,6 +1,7 @@
 # AI-powered Tab completion for zsh
 #
-# Shift+Tab → fetch / refresh suggestions
+# Ctrl+L → fetch / refresh suggestions (l = list)
+# Ctrl+G → ask AI (g = generate)
 # Up/Down  → navigate suggestions
 # Enter    → accept suggestion (press Enter again to execute)
 # Ctrl+C   → cancel menu, restore original input
@@ -242,7 +243,7 @@ _ai_show_answer() {
     zle reset-prompt
 }
 
-# ── Shift+Tab: fetch / refresh suggestions ───────────────────
+# ── Ctrl+L: fetch / refresh suggestions ───────────────────
 _ai_trigger() {
     local input="${LBUFFER}"
 
@@ -288,7 +289,7 @@ _ai_trigger() {
     _ai_show
 }
 
-# ── Ctrl+G: ask AI and render answer ─────────────────────────
+# ── Ctrl+G: ask AI and render answer (g = generate) ──────────
 _ai_ask() {
     local input="${LBUFFER}"
     [[ -z "${input// /}" ]] && return
@@ -375,8 +376,8 @@ zle -N ai-enter  _ai_enter
 zle -N ai-cancel _ai_cancel
 
 # ── Key bindings ──────────────────────────────────────────────
-bindkey '^[[Z' ai-trigger  # Shift+Tab
-bindkey '^G'   ai-ask      # Ctrl+G
+bindkey '^L'   ai-trigger  # Ctrl+L (l = list)
+bindkey '^G'   ai-ask      # Ctrl+G (g = generate)
 bindkey '\e[A' ai-up        # Up arrow
 bindkey '\e[B' ai-down      # Down arrow
 bindkey '\eOA' ai-up        # Up arrow (alt)
@@ -386,4 +387,4 @@ bindkey '^J'   ai-enter     # Enter (LF)
 bindkey '^C'   ai-cancel    # Ctrl+C to cancel
 
 # ── Init ──────────────────────────────────────────────────────
-echo "AI command completion loaded. Shift+Tab → suggest, Ctrl+G → ask AI, ↑↓ → navigate, Enter → accept."
+echo "AI command completion loaded. Ctrl+L → list suggestions, Ctrl+G → ask AI, ↑↓ → navigate, Enter → accept."

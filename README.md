@@ -2,14 +2,15 @@
 
 TerminalTab 是一个轻量的 zsh 插件。
 
-它会在你输入命令后，通过 `Shift+Tab` 调用大模型 API，返回一组选好的完整命令建议，适合用来：
+它会在你输入命令后，通过 `Ctrl+L` 调用大模型 API，返回一组选好的完整命令建议，适合用来：
 - 修正拼写错误
 - 补全半截命令
 - 为已有命令推荐常用参数组合
 
 ## 特性
 
-- `Shift+Tab` 触发 AI 建议
+- `Ctrl+L` 触发 AI 建议（l = list）
+- `Ctrl+G` 向 AI 提问（g = generate）
 - 垂直边框菜单展示结果
 - `↑ / ↓` 切换高亮
 - `Enter` 接受当前建议
@@ -30,7 +31,7 @@ TerminalTab 是一个轻量的 zsh 插件。
 
 TerminalTab 的工作流程很简单：
 
-1. 你在命令行里输入内容后按 `Shift+Tab`
+1. 你在命令行里输入内容后按 `Ctrl+L`
 2. `ai-complete.zsh` 读取当前输入，并在后台调用 `ai-suggest`
 3. `ai-suggest` 请求大模型，让它返回“每行一条”的完整命令建议
 4. 返回结果会在本地再次清洗，过滤掉空行、编号、项目符号、代码块残留和重复项
@@ -94,7 +95,8 @@ source ~/.zshrc
 
 输入命令后按：
 
-- `Shift+Tab`：请求 / 刷新 AI 建议
+- `Ctrl+L`：请求 / 刷新 AI 建议（l = list）
+- `Ctrl+G`：向 AI 提问（g = generate）
 - `↑ / ↓`：切换高亮项
 - `Enter`：接受当前高亮建议
 - `Ctrl+C`：取消菜单并恢复输入
@@ -105,7 +107,7 @@ source ~/.zshrc
 ls
 ```
 
-按下 `Shift+Tab` 后，可能得到：
+按下 `Ctrl+L` 后，可能得到：
 
 ```bash
 ls -la
@@ -120,7 +122,7 @@ ls -lS
 toush
 ```
 
-按下 `Shift+Tab` 后，可能得到：
+按下 `Ctrl+L` 后，可能得到：
 
 ```bash
 touch filename
@@ -141,7 +143,7 @@ touch -a filename
 当前会执行：
 - navigation buffer regression
 - ai-suggest cleanup regression
-- shift+tab binding regression
+- ctrl+l binding regression
 - trigger rename regression
 
 ## 适配其它 API
@@ -156,8 +158,7 @@ export AI_COMPLETE_MODEL="your-model"
 ## 注意事项
 
 - 本插件依赖 zsh 的 ZLE 机制，不适用于 bash
-- 某些终端或 tmux 配置可能会改写 `Shift+Tab` 转义序列；如果发现按键无效，需要先确认终端是否发送 `^[[Z`
-- `Tab` 本身未被占用，仍可保留给原生补全或其它插件
+- `Tab` 和 `Shift+Tab` 均未被占用，仍可保留给原生补全或其它插件
 
 ## License
 

@@ -22,6 +22,6 @@ run_test "auto render space regression" "$TEST_DIR/test_render_mode_auto_space.z
 run_test "inline render mode regression" "$TEST_DIR/test_render_mode_inline_terminal.zsh"
 run_test "ai-suggest cleanup regression" "$TEST_DIR/test_ai_suggest_cleanup.zsh"
 run_test "ai ask mode regression" "$TEST_DIR/test_ai_ask_mode.zsh"
-run_test "shift+tab binding regression" "$TEST_DIR/test_shift_tab_binding.zsh"
+run_test "ctrl+l binding regression" "$TEST_DIR/test_ctrl_l_binding.zsh"
 run_test "ctrl+g binding regression" "$TEST_DIR/test_ctrl_g_binding.zsh"
 run_test "trigger rename regression" "$TEST_DIR/test_trigger_rename.zsh"

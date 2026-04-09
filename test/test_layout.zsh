@@ -6,7 +6,7 @@ PROJECT_DIR=${0:A:h:h}
 for file in \
     test_navigation_buffer.zsh \
     test_ai_suggest_cleanup.zsh \
-    test_shift_tab_binding.zsh \
+    test_ctrl_l_binding.zsh \
     test_trigger_rename.zsh \
     test_runner_smoke.zsh
  do
