@@ -13,10 +13,10 @@ TerminalTab 是一个 zsh 插件，提供四个核心快捷键：
 四个快捷键均支持自定义，通过环境变量覆盖默认值，详见"配置"一节。
 
 核心分为五层：
-- `ai-complete.zsh` — ZLE（Zsh 行编辑器）总入口，负责快捷键注册与校验、loading、AI 菜单渲染、统一状态管理
+- `ai-complete.zsh` — ZLE 总入口，负责 setup、autosuggestions 加载、配置校验、快捷键注册、widget 调度
+- `ai-suggest.zsh` — Ctrl+L 核心模块：AI 菜单状态管理、边框渲染、导航、accept/cancel
+- `ai-generate.zsh` — Ctrl+G 核心模块：AI 问答、回答显示
 - `zsh-autosuggestions-enhance.sh` — 基于官方 autosuggestions 的历史多候选 inline cycling 增强层
-- `ai-command-list.sh` — Ctrl+L 建议入口
-- `ai-command-generate.sh` — Ctrl+G 问答入口
 - `ai-command-request.sh` — 共享 LLM 请求层，负责配置校验、prompt 加载、API 请求、响应提取与建议清洗
 
 ## 架构
@@ -25,9 +25,8 @@ TerminalTab 是一个 zsh 插件，提供四个核心快捷键：
 
 ```
 用户按 Ctrl+L (l = list)
-  → ai-complete.zsh (_ai_trigger widget)
-    → ai-command-list.sh（通过 &! 后台运行）
-    → ai-command-request.sh（共享请求层）
+  → ai-complete.zsh (_ai_trigger widget，定义在 ai-suggest.zsh)
+    → ai-command-request.sh list（通过 &! 后台运行）
     → 通过 POSTDISPLAY 在输入内容后显示 "AI generating..." 提示
     → _ai_show: zle redisplay → 清理旧列表 → DEC 保存光标 → printf 边框列表 → DEC 恢复光标
   → 用户按 上/下
@@ -126,10 +125,12 @@ source ~/path/to/TerminalTab/ai-complete.zsh
 ### 10. zsh 字符串中的 ANSI 转义码
 - `\e[7m`（反色显示）必须用 `$'\e[7m'`（`$'...'` 引用语法），不能用双引号中的 `\e[7m`，后者会原样输出 `e[7m` 文本。
 
-### 11. 入口层与 autosuggestions 增强层分离
-- `ai-complete.zsh` 应保持为入口和装配层：负责快捷键注册、AI 菜单、loading、统一生命周期。
+### 11. 入口层与核心模块分离
+- `ai-complete.zsh` 应保持为入口和装配层：负责 setup、autosuggestions 加载、配置校验、快捷键注册、widget 调度。
+- Ctrl+L AI 菜单核心逻辑放在 `ai-suggest.zsh`，Ctrl+G AI 问答核心逻辑放在 `ai-generate.zsh`。
 - 历史多候选 inline suggestion cycling 放在 `zsh-autosuggestions-enhance.sh`，不要把这部分逻辑重新塞回 `ai-complete.zsh`。
 - `Ctrl+U` / `Ctrl+N` 的默认行为和校验仍由入口层负责，但具体 history candidate 收集、inline overlay、accept/cancel/reset 由增强层实现。
+- 入口层通过 dispatch widget（`_ai_up`、`_ai_down`、`_ai_enter`、`_ai_cancel`、`_ai_history_prev`、`_ai_history_next`）协调各模块，根据 `_AI_ACTIVE` 状态分发到对应模块。
 
 ### 12. zsh-autosuggestions widget 交互
 - 官方 `zsh-autosuggestions` 会把用户自定义 widget 包裹为"modify"类型，导致它在 widget 执行后自动清除 `POSTDISPLAY`。

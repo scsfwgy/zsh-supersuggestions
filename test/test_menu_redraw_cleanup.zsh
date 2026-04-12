@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR=${0:A:h:h}
-PLUGIN_FILE="$PROJECT_DIR/ai-complete.zsh"
+PLUGIN_FILE="$PROJECT_DIR/ai-suggest.zsh"
 content=$(<"$PLUGIN_FILE")
 
 show_block=${content#*"_ai_show() {"}
