@@ -55,6 +55,23 @@ brew install jq curl
 
 如果系统已自带 `curl`，通常只需要安装 `jq`。
 
+此外，TerminalTab 现在依赖官方 `zsh-users/zsh-autosuggestions`。
+
+推荐方式是直接让 TerminalTab 在首次加载时自动下载到当前仓库的 `vendor/zsh-autosuggestions`；该目录适合加入 `.gitignore`，避免产生 git 噪音。
+
+如果你更偏好系统级安装，也可以使用 Homebrew：
+
+```bash
+brew install zsh-autosuggestions
+```
+
+加载 `ai-complete.zsh` 时会按以下顺序处理：
+- 如果官方 `zsh-autosuggestions` 已经加载，直接跳过
+- 如果当前仓库的 `vendor/zsh-autosuggestions` 已存在，TerminalTab 会优先自动 `source`
+- 如果系统里已安装但尚未加载，TerminalTab 会自动 `source`
+- 如果未安装，TerminalTab 会在交互式 shell 中让你选择：自动下载到当前仓库的 `vendor/zsh-autosuggestions`，或稍后手动安装
+- 如果是非交互式环境，TerminalTab 会直接打印安装指引并停止加载
+
 ## 安装
 
 1. 克隆仓库：
@@ -66,8 +83,9 @@ cd TerminalTab
 
 2. 在 `~/.zshrc` 中加入配置：
 
-简洁版配置
-```
+最简配置：
+
+```bash
 export AI_COMPLETE_API_KEY="sk-..."
 export AI_COMPLETE_MODEL="gpt-4o-mini"
 export AI_COMPLETE_API_URL="https://api.openai.com/v1/chat/completions"
@@ -75,8 +93,14 @@ export AI_COMPLETE_API_URL="https://api.openai.com/v1/chat/completions"
 source /path/to/TerminalTab/ai-complete.zsh
 ```
 
-完整版bash
-```
+首次 `source /path/to/TerminalTab/ai-complete.zsh` 时：
+- 如果当前仓库下已经有 `vendor/zsh-autosuggestions`，会直接复用
+- 如果还没有，TerminalTab 会提示你选择是否自动下载到当前仓库的 `vendor/zsh-autosuggestions`
+- 该目录适合加入 `.gitignore`，避免产生 git 噪音
+
+完整配置示例：
+
+```bash
 export AI_COMPLETE_API_TYPE="openai"
 export AI_COMPLETE_API_KEY="sk-..."
 export AI_COMPLETE_MODEL="gpt-4o-mini"
@@ -88,6 +112,12 @@ export AI_COMPLETE_ASK_BINDKEY='^G'
 source /path/to/TerminalTab/ai-complete.zsh
 ```
 
+如果你更希望用系统级安装，也可以先通过 Homebrew 安装，或手动在 `~/.zshrc` 中先加载官方插件：
+
+```bash
+source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+source /path/to/TerminalTab/ai-complete.zsh
+```
 
 其中以下 3 个变量是必填项：
 - `AI_COMPLETE_API_URL`

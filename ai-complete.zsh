@@ -15,7 +15,7 @@
 #   export AI_COMPLETE_TRIGGER_BINDKEY='^L'             (optional, default Ctrl+L)
 #   export AI_COMPLETE_ASK_BINDKEY='^G'                 (optional, default Ctrl+G)
 #
-# Dependencies: jq, curl
+# Dependencies: jq, curl, zsh-autosuggestions
 
 # ── Setup ─────────────────────────────────────────────────────
 _ai_setup() {
@@ -27,6 +27,146 @@ _ai_setup() {
     if [[ ! -x "$suggest_script" && -f "$suggest_script" ]]; then
         chmod +x "$suggest_script" 2>/dev/null || true
     fi
+}
+
+_ai_is_official_autosuggestions_loaded() {
+    (( ${+functions[_zsh_autosuggest_start]} ))
+}
+
+_ai_vendor_autosuggestions_path() {
+    local script_dir="${0:A:h}"
+    print -- "$script_dir/vendor/zsh-autosuggestions/zsh-autosuggestions.zsh"
+}
+
+_ai_find_official_autosuggestions() {
+    local -a candidates=()
+    local brew_prefix="${HOMEBREW_PREFIX:-}"
+    local vendor_path
+    vendor_path=$(_ai_vendor_autosuggestions_path)
+
+    [[ -n "$vendor_path" ]] && candidates+=("$vendor_path")
+
+    if [[ -z "$brew_prefix" ]] && command -v brew >/dev/null 2>&1; then
+        brew_prefix=$(brew --prefix 2>/dev/null)
+    fi
+
+    [[ -n "$brew_prefix" ]] && candidates+=(
+        "$brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    )
+
+    [[ -n "${ZSH_CUSTOM:-}" ]] && candidates+=(
+        "$ZSH_CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    )
+
+    [[ -n "${ZSH:-}" ]] && candidates+=(
+        "$ZSH/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    )
+
+    candidates+=(
+        "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    )
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        [[ -f "$candidate" ]] || continue
+        print -- "$candidate"
+        return 0
+    done
+
+    return 1
+}
+
+_ai_print_autosuggestions_install_help() {
+    local vendor_path
+    vendor_path=$(_ai_vendor_autosuggestions_path)
+    print -u2 -- "TerminalTab requires zsh-users/zsh-autosuggestions."
+    print -u2 -- "Choose one of the following:"
+    print -u2 -- "  1) Install with Homebrew: brew install zsh-autosuggestions"
+    print -u2 -- "  2) Auto-download to: $vendor_path"
+    print -u2 -- "Repository: https://github.com/zsh-users/zsh-autosuggestions"
+}
+
+_ai_prompt_autosuggestions_install() {
+    [[ -o interactive ]] || return 1
+    [[ -r /dev/tty && -w /dev/tty ]] || return 1
+
+    local tty_path=/dev/tty
+    local choice
+
+    printf '%s\n' "TerminalTab could not find zsh-autosuggestions." > "$tty_path"
+    printf '%s\n' "[1] Auto-download now" > "$tty_path"
+    printf '%s\n' "[2] I'll install it manually" > "$tty_path"
+    printf '%s\n' "Enter 1 or 2, then press Enter:" > "$tty_path"
+    if ! read -r choice < "$tty_path"; then
+        return 1
+    fi
+
+    [[ "$choice" == '1' ]]
+}
+
+_ai_download_official_autosuggestions() {
+    command -v git >/dev/null 2>&1 || {
+        print -u2 -- "TerminalTab cannot auto-download zsh-autosuggestions because git is not installed."
+        return 1
+    }
+
+    local plugin_dir plugin_path
+    plugin_path=$(_ai_vendor_autosuggestions_path)
+    plugin_dir="${plugin_path:h}"
+
+    mkdir -p "$plugin_dir" || {
+        print -u2 -- "TerminalTab could not create autosuggestions directory: $plugin_dir"
+        return 1
+    }
+
+    if [[ -f "$plugin_path" ]]; then
+        print -- "$plugin_path"
+        return 0
+    fi
+
+    git clone https://github.com/zsh-users/zsh-autosuggestions.git "$plugin_dir" >/dev/null 2>&1 || {
+        print -u2 -- "TerminalTab failed to download zsh-autosuggestions into: $plugin_dir"
+        return 1
+    }
+
+    [[ -f "$plugin_path" ]] || {
+        print -u2 -- "TerminalTab downloaded zsh-autosuggestions but did not find: $plugin_path"
+        return 1
+    }
+
+    print -- "$plugin_path"
+}
+
+_ai_require_official_autosuggestions() {
+    _ai_is_official_autosuggestions_loaded && return 0
+
+    local plugin_path
+    plugin_path=$(_ai_find_official_autosuggestions)
+
+    if [[ -z "$plugin_path" ]]; then
+        if _ai_prompt_autosuggestions_install; then
+            plugin_path=$(_ai_download_official_autosuggestions) || {
+                _ai_print_autosuggestions_install_help
+                return 1
+            }
+        else
+            _ai_print_autosuggestions_install_help
+            return 1
+        fi
+    fi
+
+    source "$plugin_path" || {
+        print -u2 -- "TerminalTab found zsh-autosuggestions at: $plugin_path"
+        print -u2 -- "but failed to source it. Please load zsh-autosuggestions before TerminalTab."
+        return 1
+    }
+
+    _ai_is_official_autosuggestions_loaded && return 0
+
+    print -u2 -- "TerminalTab sourced zsh-autosuggestions from: $plugin_path"
+    print -u2 -- "but the plugin did not finish loading correctly. Please verify your zsh-autosuggestions installation."
+    return 1
 }
 
 _ai_loading_frames() {
@@ -103,6 +243,7 @@ _ai_get_cursor_row() {
 }
 
 _ai_setup
+_ai_require_official_autosuggestions || return 1
 _ai_setup_render_mode
 _ai_loading_frames
 
@@ -137,11 +278,11 @@ _ai_validate_custom_bindkey() {
     local key="$2"
     local reserved
 
-    [[ -n "$key" ]] || _ai_fail_config "$env_name cannot be empty. Use zsh bindkey syntax like '^L'."
-    [[ "$key" != $'\e' ]] || _ai_fail_config "$env_name does not support bare Escape (\\e) because it conflicts with arrow-key sequences."
+    [[ -n "$key" ]] || { _ai_fail_config "$env_name cannot be empty. Use zsh bindkey syntax like '^L'."; return 1; }
+    [[ "$key" != $'\e' ]] || { _ai_fail_config "$env_name does not support bare Escape (\\e) because it conflicts with arrow-key sequences."; return 1; }
 
     for reserved in "${_AI_RESERVED_BINDKEYS[@]}"; do
-        [[ "$key" != "$reserved" ]] || _ai_fail_config "$env_name cannot use reserved key sequence $key."
+        [[ "$key" != "$reserved" ]] || { _ai_fail_config "$env_name cannot use reserved key sequence $key."; return 1; }
     done
 }
 
