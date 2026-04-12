@@ -4,15 +4,18 @@ set -euo pipefail
 PROJECT_DIR=${0:A:h:h}
 PLUGIN_FILE="$PROJECT_DIR/ai-complete.zsh"
 TEST_TMP=$(mktemp -d)
-VENDOR_DIR="$PROJECT_DIR/vendor/zsh-autosuggestions"
-trap 'rm -rf "$TEST_TMP" "$VENDOR_DIR"' EXIT
+VENDOR_ROOT="$TEST_TMP/vendor/zsh-autosuggestions"
+VENDOR_PLUGIN="$VENDOR_ROOT/zsh-autosuggestions.zsh"
+trap '
+    rm -rf "$TEST_TMP"
+' EXIT
 
 run_with_stub() {
     local home_dir="$1"
     shift
-    mkdir -p "$VENDOR_DIR"
-    printf "%s\n" "_zsh_autosuggest_start() { :; }" > "$VENDOR_DIR/zsh-autosuggestions.zsh"
-    env -i PATH="$PATH" HOME="$home_dir" "$@" zsh -c '
+    mkdir -p "$VENDOR_ROOT"
+    printf "%s\n" "_zsh_autosuggest_start() { :; }" > "$VENDOR_PLUGIN"
+    env -i PATH="$PATH" HOME="$home_dir" AI_COMPLETE_AUTOSUGGESTIONS_PATH="$VENDOR_PLUGIN" "$@" zsh -c '
         source "'$PLUGIN_FILE'"
     ' 2>&1
 }
@@ -90,11 +93,24 @@ duplicate_bindings_output=$(run_with_stub "$TEST_TMP/home4" AI_COMPLETE_TRIGGER_
     exit 1
 }
 
-valid_custom_output=$(run_with_stub "$TEST_TMP/home5" AI_COMPLETE_TRIGGER_BINDKEY='^T' AI_COMPLETE_ASK_BINDKEY='^Y')
-[[ "$valid_custom_output" == *"Ctrl+T → list suggestions, Ctrl+Y → ask AI"* ]] || {
-    print -u2 "expected valid custom bindkeys to appear in startup text"
-    print -u2 "$valid_custom_output"
+
+duplicate_history_bindings_output=$(run_with_stub "$TEST_TMP/home6" AI_COMPLETE_HISTORY_PREV_BINDKEY='^U' AI_COMPLETE_HISTORY_NEXT_BINDKEY='^U' || true)
+[[ "$duplicate_history_bindings_output" == *"AI_COMPLETE_HISTORY_PREV_BINDKEY and AI_COMPLETE_HISTORY_NEXT_BINDKEY must be different."* ]] || {
+    print -u2 "expected duplicate history bindkeys to fail"
+    print -u2 "$duplicate_history_bindings_output"
     exit 1
 }
 
-print "ok"
+history_conflict_output=$(run_with_stub "$TEST_TMP/home7" AI_COMPLETE_TRIGGER_BINDKEY='^U' || true)
+[[ "$history_conflict_output" == *"AI_COMPLETE_TRIGGER_BINDKEY and AI_COMPLETE_HISTORY_PREV_BINDKEY must be different."* ]] || {
+    print -u2 "expected trigger/history bindkey conflict to fail"
+    print -u2 "$history_conflict_output"
+    exit 1
+}
+
+valid_history_output=$(run_with_stub "$TEST_TMP/home8" AI_COMPLETE_HISTORY_PREV_BINDKEY='^P' AI_COMPLETE_HISTORY_NEXT_BINDKEY='^N')
+[[ "$valid_history_output" == *"Ctrl+P/Ctrl+N → cycle history"* ]] || {
+    print -u2 "expected valid history bindkeys to appear in startup text"
+    print -u2 "$valid_history_output"
+    exit 1
+}

@@ -3,7 +3,9 @@
 # Default shortcuts:
 #   Ctrl+L → fetch / refresh suggestions (l = list)
 #   Ctrl+G → ask AI (g = generate)
-#   Up/Down → navigate suggestions
+#   Ctrl+U → previous history suggestion
+#   Ctrl+N → next history suggestion
+#   Up/Down → navigate AI suggestions
 #   Enter   → accept suggestion (press Enter again to execute)
 #   Ctrl+C  → cancel menu, restore original input
 #
@@ -14,12 +16,19 @@
 #   export AI_COMPLETE_API_TYPE="openai"               (optional: openai or claude)
 #   export AI_COMPLETE_TRIGGER_BINDKEY='^L'             (optional, default Ctrl+L)
 #   export AI_COMPLETE_ASK_BINDKEY='^G'                 (optional, default Ctrl+G)
+#   export AI_COMPLETE_HISTORY_PREV_BINDKEY='^U'        (optional, default Ctrl+U)
+#   export AI_COMPLETE_HISTORY_NEXT_BINDKEY='^N'        (optional, default Ctrl+N)
 #
 # Dependencies: jq, curl, zsh-autosuggestions
 
 # ── Setup ─────────────────────────────────────────────────────
+_ai_script_dir() {
+    print -- "${${(%):-%N}:A:h}"
+}
+
 _ai_setup() {
-    local script_dir="${0:A:h}"
+    local script_dir
+    script_dir=$(_ai_script_dir)
     local script_path
     local -a command_scripts=(
         "$script_dir/ai-command-list.sh"
@@ -43,7 +52,13 @@ _ai_is_official_autosuggestions_loaded() {
 }
 
 _ai_vendor_autosuggestions_path() {
-    local script_dir="${0:A:h}"
+    if [[ -n "${AI_COMPLETE_AUTOSUGGESTIONS_PATH:-}" ]]; then
+        print -- "$AI_COMPLETE_AUTOSUGGESTIONS_PATH"
+        return 0
+    fi
+
+    local script_dir
+    script_dir=$(_ai_script_dir)
     print -- "$script_dir/vendor/zsh-autosuggestions/zsh-autosuggestions.zsh"
 }
 
@@ -264,6 +279,8 @@ fi
 
 _AI_TRIGGER_BINDKEY_DEFAULT='^L'
 _AI_ASK_BINDKEY_DEFAULT='^G'
+_AI_HISTORY_PREV_BINDKEY_DEFAULT='^U'
+_AI_HISTORY_NEXT_BINDKEY_DEFAULT='^N'
 _AI_RESERVED_BINDKEYS=($'\e' '\e[A' '\e[B' '\eOA' '\eOB' '^M' '^J' '^C')
 
 _ai_fail_config() {
@@ -310,10 +327,31 @@ _ai_setup_bindkeys() {
         _AI_ASK_BINDKEY=$_AI_ASK_BINDKEY_DEFAULT
     fi
 
+    if [[ -n "${AI_COMPLETE_HISTORY_PREV_BINDKEY+x}" ]]; then
+        _AI_HISTORY_PREV_BINDKEY=${AI_COMPLETE_HISTORY_PREV_BINDKEY}
+        _ai_validate_custom_bindkey "AI_COMPLETE_HISTORY_PREV_BINDKEY" "$_AI_HISTORY_PREV_BINDKEY" || return 1
+    else
+        _AI_HISTORY_PREV_BINDKEY=$_AI_HISTORY_PREV_BINDKEY_DEFAULT
+    fi
+
+    if [[ -n "${AI_COMPLETE_HISTORY_NEXT_BINDKEY+x}" ]]; then
+        _AI_HISTORY_NEXT_BINDKEY=${AI_COMPLETE_HISTORY_NEXT_BINDKEY}
+        _ai_validate_custom_bindkey "AI_COMPLETE_HISTORY_NEXT_BINDKEY" "$_AI_HISTORY_NEXT_BINDKEY" || return 1
+    else
+        _AI_HISTORY_NEXT_BINDKEY=$_AI_HISTORY_NEXT_BINDKEY_DEFAULT
+    fi
+
     [[ "$_AI_TRIGGER_BINDKEY" != "$_AI_ASK_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_TRIGGER_BINDKEY and AI_COMPLETE_ASK_BINDKEY must be different."
+    [[ "$_AI_TRIGGER_BINDKEY" != "$_AI_HISTORY_PREV_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_TRIGGER_BINDKEY and AI_COMPLETE_HISTORY_PREV_BINDKEY must be different."
+    [[ "$_AI_TRIGGER_BINDKEY" != "$_AI_HISTORY_NEXT_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_TRIGGER_BINDKEY and AI_COMPLETE_HISTORY_NEXT_BINDKEY must be different."
+    [[ "$_AI_ASK_BINDKEY" != "$_AI_HISTORY_PREV_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_ASK_BINDKEY and AI_COMPLETE_HISTORY_PREV_BINDKEY must be different."
+    [[ "$_AI_ASK_BINDKEY" != "$_AI_HISTORY_NEXT_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_ASK_BINDKEY and AI_COMPLETE_HISTORY_NEXT_BINDKEY must be different."
+    [[ "$_AI_HISTORY_PREV_BINDKEY" != "$_AI_HISTORY_NEXT_BINDKEY" ]] || _ai_fail_config "AI_COMPLETE_HISTORY_PREV_BINDKEY and AI_COMPLETE_HISTORY_NEXT_BINDKEY must be different."
 
     _AI_TRIGGER_BINDKEY_LABEL=$(_ai_bindkey_label "$_AI_TRIGGER_BINDKEY")
     _AI_ASK_BINDKEY_LABEL=$(_ai_bindkey_label "$_AI_ASK_BINDKEY")
+    _AI_HISTORY_PREV_BINDKEY_LABEL=$(_ai_bindkey_label "$_AI_HISTORY_PREV_BINDKEY")
+    _AI_HISTORY_NEXT_BINDKEY_LABEL=$(_ai_bindkey_label "$_AI_HISTORY_NEXT_BINDKEY")
 }
 
 _ai_setup_bindkeys || return 1
@@ -330,6 +368,26 @@ _AI_CURSOR_ROW=0
 _AI_LAST_LINES=0
 _AI_RENDER_MODE="${_AI_RENDER_MODE:-multiline}"
 _AI_LAST_OUTPUT=""
+
+_ai_history_prev_handler() {
+    zle kill-line
+}
+
+_ai_history_next_handler() {
+    zle down-line-or-history
+}
+
+_ai_history_reset() {
+    return 0
+}
+
+_ai_history_accept() {
+    return 1
+}
+
+_ai_history_cancel() {
+    return 1
+}
 
 # ── Clamp scroll window ──────────────────────────────────────
 _ai_clamp_scroll() {
@@ -521,6 +579,8 @@ _ai_trigger() {
     local input="${LBUFFER}"
     local config_message
 
+    _ai_history_reset
+
     [[ -z "${input// /}" ]] && { zle expand-or-complete; return }
 
     if config_message=$(_ai_missing_config_message); then
@@ -556,6 +616,8 @@ _ai_trigger() {
 _ai_ask() {
     local input="${LBUFFER}"
     local config_message
+
+    _ai_history_reset
     [[ -z "${input// /}" ]] && return
 
     if config_message=$(_ai_missing_config_message); then
@@ -576,6 +638,15 @@ _ai_ask() {
     _ai_show_answer "${answer:-no response}"
 }
 
+# ── History previous suggestion ───────────────────────────────
+_ai_history_prev() {
+    if (( _AI_ACTIVE )); then
+        _ai_up
+        return
+    fi
+    _ai_history_prev_handler
+}
+
 # ── Down arrow: next suggestion ──────────────────────────────
 _ai_down() {
     if (( _AI_ACTIVE && ${#_AI_SUGGESTIONS} > 0 )); then
@@ -584,6 +655,15 @@ _ai_down() {
     else
         zle down-line-or-history
     fi
+}
+
+# ── History next suggestion ──────────────────────────────────
+_ai_history_next() {
+    if (( _AI_ACTIVE )); then
+        _ai_down
+        return
+    fi
+    _ai_history_next_handler
 }
 
 # ── Up arrow: previous suggestion ────────────────────────────
@@ -600,10 +680,14 @@ _ai_up() {
 _ai_enter() {
     if (( _AI_ACTIVE && ${#_AI_SUGGESTIONS} > 0 )); then
         _ai_clear_menu
+        _ai_history_reset
         LBUFFER="${_AI_SUGGESTIONS[$(( _AI_INDEX + 1 ))]}"
         RBUFFER="$_AI_RIGHT"
         _ai_reset_menu
         zle redisplay
+        return
+    fi
+    if _ai_history_accept; then
         return
     fi
     zle accept-line
@@ -613,10 +697,13 @@ _ai_enter() {
 _ai_cancel() {
     if (( _AI_ACTIVE )); then
         _ai_clear_menu
+        _ai_history_reset
         LBUFFER="$_AI_ORIGINAL"
         RBUFFER="$_AI_RIGHT"
         _ai_reset_menu
         zle redisplay
+    elif _ai_history_cancel; then
+        return
     else
         zle send-break
     fi
@@ -625,14 +712,18 @@ _ai_cancel() {
 # ── Register widgets ──────────────────────────────────────────
 zle -N ai-trigger _ai_trigger
 zle -N ai-ask _ai_ask
+zle -N ai-history-prev _ai_history_prev
+zle -N ai-history-next _ai_history_next
 zle -N ai-down   _ai_down
 zle -N ai-up     _ai_up
 zle -N ai-enter  _ai_enter
 zle -N ai-cancel _ai_cancel
 
 # ── Key bindings ──────────────────────────────────────────────
-bindkey "$_AI_TRIGGER_BINDKEY" ai-trigger  # configurable trigger binding
-bindkey "$_AI_ASK_BINDKEY" ai-ask          # configurable ask binding
+bindkey "$_AI_TRIGGER_BINDKEY" ai-trigger        # configurable trigger binding
+bindkey "$_AI_ASK_BINDKEY" ai-ask                # configurable ask binding
+bindkey "$_AI_HISTORY_PREV_BINDKEY" ai-history-prev  # configurable history previous binding
+bindkey "$_AI_HISTORY_NEXT_BINDKEY" ai-history-next  # configurable history next binding
 bindkey '\e[A' ai-up        # Up arrow
 bindkey '\e[B' ai-down      # Down arrow
 bindkey '\eOA' ai-up        # Up arrow (alt)
@@ -641,5 +732,37 @@ bindkey '^M'   ai-enter     # Enter
 bindkey '^J'   ai-enter     # Enter (LF)
 bindkey '^C'   ai-cancel    # Ctrl+C to cancel
 
+_ai_bind_widget_key() {
+    local key="$1"
+    local widget="$2"
+
+    bindkey "$key" "$widget" 2>/dev/null || true
+    bindkey -M emacs "$key" "$widget" 2>/dev/null || true
+    bindkey -M viins "$key" "$widget" 2>/dev/null || true
+}
+
+_ai_bind_widget_key "$_AI_TRIGGER_BINDKEY" ai-trigger
+_ai_bind_widget_key "$_AI_ASK_BINDKEY" ai-ask
+_ai_bind_widget_key "$_AI_HISTORY_PREV_BINDKEY" ai-history-prev
+_ai_bind_widget_key "$_AI_HISTORY_NEXT_BINDKEY" ai-history-next
+_ai_bind_widget_key '\e[A' ai-up
+_ai_bind_widget_key '\e[B' ai-down
+_ai_bind_widget_key '\eOA' ai-up
+_ai_bind_widget_key '\eOB' ai-down
+_ai_bind_widget_key '^M' ai-enter
+_ai_bind_widget_key '^J' ai-enter
+_ai_bind_widget_key '^C' ai-cancel
+
+_ai_load_history_enhancement() {
+    local script_dir
+    script_dir=$(_ai_script_dir)
+    local enhance_script="$script_dir/zsh-autosuggestions-enhance.sh"
+
+    [[ -f "$enhance_script" ]] || return 0
+    source "$enhance_script"
+}
+
+_ai_load_history_enhancement || return 1
+
 # ── Init ──────────────────────────────────────────────────────
-echo "AI command completion loaded. ${_AI_TRIGGER_BINDKEY_LABEL} → list suggestions, ${_AI_ASK_BINDKEY_LABEL} → ask AI, ↑↓ → navigate, Enter → accept."
+echo "AI command completion loaded. ${_AI_TRIGGER_BINDKEY_LABEL} → list suggestions, ${_AI_ASK_BINDKEY_LABEL} → ask AI, ${_AI_HISTORY_PREV_BINDKEY_LABEL}/${_AI_HISTORY_NEXT_BINDKEY_LABEL} → cycle history, ↑↓ → navigate, Enter → accept."

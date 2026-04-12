@@ -4,8 +4,11 @@ set -euo pipefail
 PROJECT_DIR=${0:A:h:h}
 PLUGIN_FILE="$PROJECT_DIR/ai-complete.zsh"
 TMP_ROOT=$(mktemp -d)
-VENDOR_DIR="$PROJECT_DIR/vendor/zsh-autosuggestions"
-trap 'rm -rf "$TMP_ROOT" "$VENDOR_DIR"' EXIT
+VENDOR_DIR="$TMP_ROOT/vendor/zsh-autosuggestions"
+VENDOR_PLUGIN="$VENDOR_DIR/zsh-autosuggestions.zsh"
+trap '
+    rm -rf "$TMP_ROOT"
+' EXIT
 
 already_loaded_output=$(env -i PATH="$PATH" HOME="$TMP_ROOT/home1" zsh -c '
     mkdir -p "$HOME"
@@ -18,9 +21,9 @@ already_loaded_output=$(env -i PATH="$PATH" HOME="$TMP_ROOT/home1" zsh -c '
     exit 1
 }
 
-auto_source_output=$(env -i PATH="$PATH" HOME="$TMP_ROOT/home2" zsh -c '
+auto_source_output=$(env -i PATH="$PATH" HOME="$TMP_ROOT/home2" AI_COMPLETE_AUTOSUGGESTIONS_PATH="$VENDOR_PLUGIN" zsh -c '
     mkdir -p "'$VENDOR_DIR'"
-    cat > "'$VENDOR_DIR'/zsh-autosuggestions.zsh" <<'"'"'EOF'"'"'
+    cat > "'$VENDOR_PLUGIN'" <<'"'"'EOF'"'"'
 _zsh_autosuggest_start() { :; }
 EOF
     source "'$PLUGIN_FILE'"
@@ -33,7 +36,7 @@ EOF
 
 rm -rf "$VENDOR_DIR"
 
-manual_install_output=$(env -i PATH="/usr/bin:/bin" HOME="$TMP_ROOT/home3" HOMEBREW_PREFIX="$TMP_ROOT/no-brew" zsh -c '
+manual_install_output=$(env -i PATH="/usr/bin:/bin" HOME="$TMP_ROOT/home3" HOMEBREW_PREFIX="$TMP_ROOT/no-brew" AI_COMPLETE_AUTOSUGGESTIONS_PATH="$TMP_ROOT/missing/zsh-autosuggestions.zsh" zsh -c '
     mkdir -p "$HOME"
     exec </dev/null
     source "'$PLUGIN_FILE'"
@@ -53,7 +56,7 @@ manual_install_output=$(env -i PATH="/usr/bin:/bin" HOME="$TMP_ROOT/home3" HOMEB
     print -u2 "$manual_install_output"
     exit 1
 }
-[[ "$manual_install_output" == *"vendor/zsh-autosuggestions"* ]] || {
+[[ "$manual_install_output" == *"zsh-autosuggestions.zsh"* ]] || {
     print -u2 "expected vendor install path in guidance"
     print -u2 "$manual_install_output"
     exit 1

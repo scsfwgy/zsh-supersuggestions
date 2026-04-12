@@ -11,6 +11,7 @@ TerminalTab 是一个轻量的 zsh 插件。
 
 - `Ctrl+L` 触发 AI 建议（l = list）
 - `Ctrl+G` 向 AI 提问（g = generate）
+- `Ctrl+U / Ctrl+N` 循环切换历史 inline suggestion
 - 垂直边框菜单展示结果
 - `↑ / ↓` 切换高亮
 - `Enter` 接受当前建议
@@ -40,9 +41,12 @@ TerminalTab 的工作流程很简单：
 
 也就是说：这个项目不是直接替你执行命令，而是把大模型输出整理成更适合直接使用的命令候选，再交给你选择。
 
+此外，TerminalTab 也会复用官方 `zsh-users/zsh-autosuggestions` 做历史增强：当你输入前缀后，可以通过灰色 inline suggestion 形式在多个历史命令之间循环切换，而不进入 `Ctrl+L` 的多行 AI 菜单。
+
 ## 文件说明
 
 - `ai-complete.zsh`：zsh 插件总入口，负责键位绑定、菜单渲染、状态管理
+- `zsh-autosuggestions-enhance.sh`：基于官方 `zsh-users/zsh-autosuggestions` 的历史多候选 inline cycling 增强层
 - `ai-command-list.sh`：`Ctrl+L` 建议入口，返回逐行命令建议
 - `ai-command-generate.sh`：`Ctrl+G` 问答入口，返回纯文本回答
 - `ai-command-request.sh`：共享请求层，负责配置校验、提示词加载、API 请求与结果清洗
@@ -110,6 +114,8 @@ export AI_COMPLETE_API_URL="https://api.openai.com/v1/chat/completions"
 export AI_COMPLETE_MAX_ITEMS=5
 export AI_COMPLETE_TRIGGER_BINDKEY='^L'
 export AI_COMPLETE_ASK_BINDKEY='^G'
+export AI_COMPLETE_HISTORY_PREV_BINDKEY='^U'
+export AI_COMPLETE_HISTORY_NEXT_BINDKEY='^N'
 
 source /path/to/TerminalTab/ai-complete.zsh
 ```
@@ -129,6 +135,8 @@ source /path/to/TerminalTab/ai-complete.zsh
 可选快捷键配置：
 - `AI_COMPLETE_TRIGGER_BINDKEY`：触发建议列表，默认 `'^L'`（即 `Ctrl+L`）
 - `AI_COMPLETE_ASK_BINDKEY`：向 AI 提问，默认 `'^G'`（即 `Ctrl+G`）
+- `AI_COMPLETE_HISTORY_PREV_BINDKEY`：切换到上一个历史 inline suggestion，默认 `'^U'`（即 `Ctrl+U`）
+- `AI_COMPLETE_HISTORY_NEXT_BINDKEY`：切换到下一个历史 inline suggestion，默认 `'^N'`（即 `Ctrl+N`）
 
 快捷键值必须使用 zsh `bindkey` 原生语法，例如 `'^T'`、`'^Y'`。如果用户显式设置了非法值（例如空值、裸 `\e`、与方向键 / Enter / Ctrl+C 冲突、或两个快捷键重复），插件会直接报错并停止加载，而不会回退到默认快捷键。
 
@@ -164,11 +172,13 @@ source ~/.zshrc
 默认快捷键：
 - `Ctrl+L`：请求 / 刷新 AI 建议（l = list）
 - `Ctrl+G`：向 AI 提问（g = generate）
-- `↑ / ↓`：切换高亮项
-- `Enter`：接受当前高亮建议
+- `Ctrl+U`：切换到上一个历史 inline suggestion
+- `Ctrl+N`：切换到下一个历史 inline suggestion
+- `↑ / ↓`：切换 AI 菜单高亮项
+- `Enter`：接受当前高亮建议或当前历史候选
 - `Ctrl+C`：取消菜单并恢复输入
 
-如果你设置了 `AI_COMPLETE_TRIGGER_BINDKEY` 或 `AI_COMPLETE_ASK_BINDKEY`，则以你配置的绑定为准；上面的 `Ctrl+L` / `Ctrl+G` 只是默认值。
+如果你设置了 `AI_COMPLETE_TRIGGER_BINDKEY`、`AI_COMPLETE_ASK_BINDKEY`、`AI_COMPLETE_HISTORY_PREV_BINDKEY` 或 `AI_COMPLETE_HISTORY_NEXT_BINDKEY`，则以你配置的绑定为准；上面的快捷键只是默认值。
 
 示例：
 
