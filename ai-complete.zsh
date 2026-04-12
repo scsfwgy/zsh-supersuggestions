@@ -22,8 +22,12 @@
 # Dependencies: jq, curl, zsh-autosuggestions
 
 # ── Setup ─────────────────────────────────────────────────────
+# Capture script directory at top level — %N is only reliable here,
+# not inside functions or $() subshells.
+_AI_SOURCE_DIR="${${(%):-%N}:A:h}"
+
 _ai_script_dir() {
-    print -- "${${(%):-%N}:A:h}"
+    print -- "$_AI_SOURCE_DIR"
 }
 
 _ai_setup() {
@@ -349,7 +353,6 @@ _ai_run_with_spinner() {
 }
 
 # ── Source core modules ───────────────────────────────────────
-_AI_SOURCE_DIR=$(_ai_script_dir)
 source "$_AI_SOURCE_DIR/ai-suggest.zsh"
 source "$_AI_SOURCE_DIR/ai-generate.zsh"
 
