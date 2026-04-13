@@ -101,7 +101,7 @@ _ai_find_official_autosuggestions() {
 _ai_print_autosuggestions_install_help() {
     local vendor_path
     vendor_path=$(_ai_vendor_autosuggestions_path)
-    print -u2 -- "TerminalTab requires zsh-users/zsh-autosuggestions."
+    print -u2 -- "zsh-supersuggestions requires zsh-users/zsh-autosuggestions."
     print -u2 -- "Choose one of the following:"
     print -u2 -- "  1) Install with Homebrew: brew install zsh-autosuggestions"
     print -u2 -- "  2) Auto-download to: $vendor_path"
@@ -115,7 +115,7 @@ _ai_prompt_autosuggestions_install() {
     local tty_path=/dev/tty
     local choice
 
-    printf '%s\n' "TerminalTab could not find zsh-autosuggestions." > "$tty_path"
+    printf '%s\n' "zsh-supersuggestions could not find zsh-autosuggestions." > "$tty_path"
     printf '%s\n' "[1] Auto-download now" > "$tty_path"
     printf '%s\n' "[2] I'll install it manually" > "$tty_path"
     printf '%s\n' "Enter 1 or 2, then press Enter:" > "$tty_path"
@@ -128,7 +128,7 @@ _ai_prompt_autosuggestions_install() {
 
 _ai_download_official_autosuggestions() {
     command -v git >/dev/null 2>&1 || {
-        print -u2 -- "TerminalTab cannot auto-download zsh-autosuggestions because git is not installed."
+        print -u2 -- "zsh-supersuggestions cannot auto-download zsh-autosuggestions because git is not installed."
         return 1
     }
 
@@ -137,7 +137,7 @@ _ai_download_official_autosuggestions() {
     plugin_dir="${plugin_path:h}"
 
     mkdir -p "$plugin_dir" || {
-        print -u2 -- "TerminalTab could not create autosuggestions directory: $plugin_dir"
+        print -u2 -- "zsh-supersuggestions could not create autosuggestions directory: $plugin_dir"
         return 1
     }
 
@@ -147,12 +147,12 @@ _ai_download_official_autosuggestions() {
     fi
 
     git clone https://github.com/zsh-users/zsh-autosuggestions.git "$plugin_dir" >/dev/null 2>&1 || {
-        print -u2 -- "TerminalTab failed to download zsh-autosuggestions into: $plugin_dir"
+        print -u2 -- "zsh-supersuggestions failed to download zsh-autosuggestions into: $plugin_dir"
         return 1
     }
 
     [[ -f "$plugin_path" ]] || {
-        print -u2 -- "TerminalTab downloaded zsh-autosuggestions but did not find: $plugin_path"
+        print -u2 -- "zsh-supersuggestions downloaded zsh-autosuggestions but did not find: $plugin_path"
         return 1
     }
 
@@ -178,14 +178,14 @@ _ai_require_official_autosuggestions() {
     fi
 
     source "$plugin_path" || {
-        print -u2 -- "TerminalTab found zsh-autosuggestions at: $plugin_path"
-        print -u2 -- "but failed to source it. Please load zsh-autosuggestions before TerminalTab."
+        print -u2 -- "zsh-supersuggestions found zsh-autosuggestions at: $plugin_path"
+        print -u2 -- "but failed to source it. Please load zsh-autosuggestions before zsh-supersuggestions."
         return 1
     }
 
     _ai_is_official_autosuggestions_loaded && return 0
 
-    print -u2 -- "TerminalTab sourced zsh-autosuggestions from: $plugin_path"
+    print -u2 -- "zsh-supersuggestions sourced zsh-autosuggestions from: $plugin_path"
     print -u2 -- "but the plugin did not finish loading correctly. Please verify your zsh-autosuggestions installation."
     return 1
 }

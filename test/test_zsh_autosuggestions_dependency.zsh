@@ -41,7 +41,7 @@ manual_install_output=$(env -i PATH="/usr/bin:/bin" HOME="$TMP_ROOT/home3" HOMEB
     exec </dev/null
     source "'$PLUGIN_FILE'"
 ' 2>&1 >/dev/null || true)
-[[ "$manual_install_output" == *"TerminalTab requires zsh-users/zsh-autosuggestions."* ]] || {
+[[ "$manual_install_output" == *"zsh-supersuggestions requires zsh-users/zsh-autosuggestions."* ]] || {
     print -u2 "expected missing dependency guidance header"
     print -u2 "$manual_install_output"
     exit 1

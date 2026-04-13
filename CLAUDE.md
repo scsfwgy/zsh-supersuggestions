@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-TerminalTab 是一个 zsh 插件，提供四个核心快捷键：
+zsh-supersuggestions 是一个 zsh 插件，提供四个核心快捷键：
 - `Ctrl+L` — 调用大模型 API 返回命令建议列表（l = list）
 - `Ctrl+G` — 向 AI 提问（g = generate）
 - `Ctrl+U` — 切换到上一个历史 inline suggestion（u = up）
@@ -73,7 +73,7 @@ export AI_COMPLETE_TRIGGER_BINDKEY='^L'                    # 可选，默认 Ctr
 export AI_COMPLETE_ASK_BINDKEY='^G'                        # 可选，默认 Ctrl+G
 export AI_COMPLETE_HISTORY_PREV_BINDKEY='^U'               # 可选，默认 Ctrl+U
 export AI_COMPLETE_HISTORY_NEXT_BINDKEY='^N'               # 可选，默认 Ctrl+N
-source ~/path/to/TerminalTab/ai-complete.zsh
+source ~/path/to/zsh-supersuggestions/ai-complete.zsh
 ```
 
 快捷键值必须使用 zsh `bindkey` 原生语法（如 `'^T'`、`'^Y'`）。非法值（空值、裸 `\e`、与保留键冲突、四个键彼此重复）会导致插件报错并停止加载。
