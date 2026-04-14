@@ -146,10 +146,13 @@ _ai_download_official_autosuggestions() {
         return 0
     fi
 
-    git clone https://github.com/zsh-users/zsh-autosuggestions.git "$plugin_dir" >/dev/null 2>&1 || {
+    print -u2 -- "Downloading zsh-autosuggestions..."
+    if git clone https://github.com/zsh-users/zsh-autosuggestions.git "$plugin_dir" >/dev/null 2>&1; then
+        print -u2 -- "Done."
+    else
         print -u2 -- "zsh-supersuggestions failed to download zsh-autosuggestions into: $plugin_dir"
         return 1
-    }
+    fi
 
     [[ -f "$plugin_path" ]] || {
         print -u2 -- "zsh-supersuggestions downloaded zsh-autosuggestions but did not find: $plugin_path"
