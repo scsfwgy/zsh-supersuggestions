@@ -203,6 +203,21 @@ _ai_setup_render_mode() {
 
 _ai_setup
 _ai_require_official_autosuggestions || return 1
+
+# ── Dependency check: jq, curl ────────────────────────────────
+_ai_check_dependencies() {
+    local missing=()
+    command -v curl >/dev/null 2>&1 || missing+=("curl")
+    command -v jq >/dev/null 2>&1 || missing+=("jq")
+
+    (( ${#missing[@]} == 0 )) && return 0
+
+    print -u2 -- "zsh-supersuggestions requires: ${(j:, :)missing}"
+    print -u2 -- "Install with: brew install ${(j: :)missing}"
+    return 1
+}
+_ai_check_dependencies || return 1
+
 _ai_setup_render_mode
 _ai_loading_frames
 
